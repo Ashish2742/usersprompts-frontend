@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+</head>
+<body>
+    <h1>UsersPrompts API Test</h1>
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="testOptimize()">Test Optimize</button>
+    <div id="results"></div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+        async function testConnection() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing connection...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/prompt-optimizer/specializations`);
+                const data = await response.json();
+                results.innerHTML = `<h3>Connection Test: SUCCESS</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                results.innerHTML = `<h3>Connection Test: FAILED</h3><p>${error.message}</p>`;
+            }
+        }
+
+        async function testOptimize() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing optimization...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/prompt-optimizer/optimize`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        system_prompt: 'Write a professional email to a client about project delays',
+                        optimization_focus: ['clarity', 'specificity', 'completeness']
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                results.innerHTML = `<h3>Optimization Test: SUCCESS</h3><p>Original: ${data.original_prompt}</p><p>Optimized: ${data.optimized_prompt.substring(0, 200)}...</p>`;
+            } catch (error) {
+                results.innerHTML = `<h3>Optimization Test: FAILED</h3><p>${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html> 

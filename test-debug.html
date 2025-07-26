@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extension Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-family: inherit;
+            resize: vertical;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        .debug-info {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Extension Debug Test</h1>
+        
+        <div class="status info">
+            <strong>Instructions:</strong> This page helps debug the UsersPrompts Chrome extension. 
+            Check the console for any errors and test the functionality.
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Test Input Field</h3>
+            <p>This simulates a ChatGPT input field:</p>
+            <textarea id="testInput" placeholder="Message ChatGPT..." rows="4">You are an AI assistant. Help users with their questions.</textarea>
+            <br>
+            <button onclick="testExtension()">Test Extension</button>
+            <button onclick="checkStorage()">Check Storage</button>
+            <button onclick="clearStorage()">Clear Storage</button>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Debug Information</h3>
+            <div id="debugInfo" class="debug-info">Loading debug information...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Console Logs</h3>
+            <div id="consoleLogs" class="debug-info">Console logs will appear here...</div>
+        </div>
+    </div>
+
+    <script>
+        // Capture console logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        const logs = [];
+        
+        function addLog(type, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            logs.push(`[${timestamp}] ${type}: ${message}`);
+            
+            // Keep only last 50 logs
+            if (logs.length > 50) {
+                logs.shift();
+            }
+            
+            document.getElementById('consoleLogs').textContent = logs.join('\n');
+        }
+        
+        console.log = (...args) => {
+            originalLog.apply(console, args);
+            addLog('LOG', ...args);
+        };
+        
+        console.error = (...args) => {
+            originalError.apply(console, args);
+            addLog('ERROR', ...args);
+        };
+        
+        console.warn = (...args) => {
+            originalWarn.apply(console, args);
+            addLog('WARN', ...args);
+        };
+
+        function updateDebugInfo() {
+            const debugInfo = {
+                url: window.location.href,
+                userAgent: navigator.userAgent,
+                extensionId: chrome?.runtime?.id || 'Not available',
+                storage: 'Checking...',
+                floatingButton: document.querySelector('[data-testid="floating-button"]') ? 'Found' : 'Not found',
+                textarea: document.querySelector('textarea') ? 'Found' : 'Not found'
+            };
+            
+            // Check chrome storage
+            if (chrome?.storage?.local) {
+                chrome.storage.local.get(null, (result) => {
+                    debugInfo.storage = JSON.stringify(result, null, 2);
+                    document.getElementById('debugInfo').textContent = JSON.stringify(debugInfo, null, 2);
+                });
+            } else {
+                debugInfo.storage = 'Chrome storage not available';
+                document.getElementById('debugInfo').textContent = JSON.stringify(debugInfo, null, 2);
+            }
+        }
+
+        function testExtension() {
+            console.log('Testing extension functionality...');
+            
+            // Simulate button click
+            const button = document.querySelector('[data-testid="floating-button"]');
+            if (button) {
+                console.log('Found floating button, clicking...');
+                button.click();
+            } else {
+                console.log('Floating button not found');
+            }
+            
+            // Test storage
+            const text = document.getElementById('testInput').value;
+            if (chrome?.storage?.local) {
+                chrome.storage.local.set({ selectedText: text }, () => {
+                    console.log('Text stored in chrome storage:', text);
+                });
+            }
+        }
+
+        function checkStorage() {
+            if (chrome?.storage?.local) {
+                chrome.storage.local.get(null, (result) => {
+                    console.log('Current storage:', result);
+                });
+            } else {
+                console.log('Chrome storage not available');
+            }
+        }
+
+        function clearStorage() {
+            if (chrome?.storage?.local) {
+                chrome.storage.local.clear(() => {
+                    console.log('Storage cleared');
+                });
+            } else {
+                console.log('Chrome storage not available');
+            }
+        }
+
+        // Update debug info every 2 seconds
+        setInterval(updateDebugInfo, 2000);
+        
+        // Initial update
+        updateDebugInfo();
+        
+        console.log('Debug page loaded');
+    </script>
+</body>
+</html> 

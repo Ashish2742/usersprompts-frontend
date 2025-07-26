@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UsersPrompts Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .demo-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        .prompt-example {
+            background: #f3f4f6;
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-4">UsersPrompts AI Demo</h1>
+            <p class="text-lg text-gray-600">Test your Chrome extension with these sample prompts</p>
+        </header>
+
+        <div class="max-w-4xl mx-auto">
+            <!-- Basic Prompt Examples -->
+            <div class="demo-section">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Basic Prompt Examples</h2>
+                <p class="text-gray-600 mb-4">Select any of these prompts to test the optimization:</p>
+                
+                <div class="prompt-example">
+                    <strong>Simple Assistant:</strong><br>
+                    You are an AI assistant. Help users.
+                </div>
+                
+                <div class="prompt-example">
+                    <strong>Customer Service:</strong><br>
+                    You are a customer service representative. Answer questions about our products.
+                </div>
+                
+                <div class="prompt-example">
+                    <strong>Code Helper:</strong><br>
+                    You are a programming assistant. Help with coding questions.
+                </div>
+                
+                <div class="prompt-example">
+                    <strong>Writing Assistant:</strong><br>
+                    You are a writing assistant. Help improve text and content.
+                </div>
+            </div>
+
+            <!-- Advanced Prompt Examples -->
+            <div class="demo-section">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Advanced Prompt Examples</h2>
+                <p class="text-gray-600 mb-4">These prompts demonstrate more complex scenarios:</p>
+                
+                <div class="prompt-example">
+                    <strong>Data Analyst:</strong><br>
+                    You are a data analyst. Analyze data and provide insights. Be thorough and accurate.
+                </div>
+                
+                <div class="prompt-example">
+                    <strong>Creative Writer:</strong><br>
+                    You are a creative writer. Generate stories and creative content. Be imaginative and engaging.
+                </div>
+                
+                <div class="prompt-example">
+                    <strong>Technical Support:</strong><br>
+                    You are a technical support specialist. Help users with technical issues. Be patient and clear.
+                </div>
+            </div>
+
+            <!-- Testing Instructions -->
+            <div class="demo-section bg-blue-50 border-blue-200">
+                <h2 class="text-2xl font-semibold text-blue-800 mb-4">How to Test</h2>
+                <ol class="list-decimal list-inside space-y-2 text-blue-700">
+                    <li><strong>Select Text:</strong> Highlight any prompt above with your mouse</li>
+                    <li><strong>Look for Tooltip:</strong> A tooltip should appear offering to optimize the text</li>
+                    <li><strong>Click Tooltip:</strong> Click the tooltip to open the extension popup</li>
+                    <li><strong>Or Use Extension Icon:</strong> Click the UsersPrompts icon in your Chrome toolbar</li>
+                    <li><strong>Enter Prompt:</strong> Paste or type a prompt in the form</li>
+                    <li><strong>Optimize:</strong> Click "Optimize Prompt" to see the results</li>
+                </ol>
+            </div>
+
+            <!-- Expected Results -->
+            <div class="demo-section bg-green-50 border-green-200">
+                <h2 class="text-2xl font-semibold text-green-800 mb-4">Expected Results</h2>
+                <p class="text-green-700 mb-4">After optimization, you should see:</p>
+                <ul class="list-disc list-inside space-y-1 text-green-700">
+                    <li><strong>Improved Prompt:</strong> A comprehensive, well-structured system prompt</li>
+                    <li><strong>Detailed Scoring:</strong> Scores across clarity, specificity, completeness, effectiveness, and robustness</li>
+                    <li><strong>What Was Wrong:</strong> Analysis of issues with the original prompt</li>
+                    <li><strong>What Was Improved:</strong> Specific improvements made to the prompt</li>
+                    <li><strong>Recommendations:</strong> Advice for further improvements</li>
+                    <li><strong>Improvement Metrics:</strong> Overall improvement percentage and points gained</li>
+                </ul>
+            </div>
+
+            <!-- Troubleshooting -->
+            <div class="demo-section bg-yellow-50 border-yellow-200">
+                <h2 class="text-2xl font-semibold text-yellow-800 mb-4">Troubleshooting</h2>
+                <div class="space-y-2 text-yellow-700">
+                    <p><strong>Extension not working?</strong></p>
+                    <ul class="list-disc list-inside ml-4">
+                        <li>Make sure the extension is loaded in Chrome</li>
+                        <li>Check that your backend server is running on localhost:8000</li>
+                        <li>Open Chrome DevTools to see any error messages</li>
+                    </ul>
+                    
+                    <p class="mt-4"><strong>API connection issues?</strong></p>
+                    <ul class="list-disc list-inside ml-4">
+                        <li>Verify the backend API is accessible</li>
+                        <li>Check CORS settings on your backend</li>
+                        <li>Test API endpoints directly with curl or Postman</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center mt-12 text-gray-500">
+            <p>UsersPrompts AI - Advanced Prompt Optimization</p>
+            <p class="text-sm mt-2">Select any text on this page to test the extension!</p>
+        </footer>
+    </div>
+</body>
+</html> 

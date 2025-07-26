@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extension Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .highlight {
+            background: yellow;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <h1>UsersPrompts Extension Debug Test</h1>
+    
+    <div class="instructions">
+        <h3>🔍 Debug Instructions:</h3>
+        <ol>
+            <li><strong>Check if extension is loaded:</strong> Look for the blue "UP" button in the top-right corner</li>
+            <li><strong>Test text selection:</strong> Select any text below and look for a tooltip</li>
+            <li><strong>Check console:</strong> Open DevTools (F12) and look for any errors</li>
+            <li><strong>Test extension icon:</strong> Click the extension icon in Chrome toolbar</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Text Selection</h2>
+        <p>Select this text to test the tooltip: <span class="highlight">You are an AI assistant. Help users with their questions.</span></p>
+        <p>Or select this longer text: <span class="highlight">You are a helpful programming assistant. Answer coding questions and provide code examples. Be clear and concise in your explanations.</span></p>
+    </div>
+
+    <div class="test-section">
+        <h2>Expected Behavior</h2>
+        <ul>
+            <li>✅ Blue "UP" button should appear in top-right corner</li>
+            <li>✅ Selecting text should show a tooltip</li>
+            <li>✅ Clicking tooltip should open the extension popup</li>
+            <li>✅ Extension icon should be visible in Chrome toolbar</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>Troubleshooting</h2>
+        <ul>
+            <li><strong>No "UP" button?</strong> Check if extension is enabled in chrome://extensions/</li>
+            <li><strong>No tooltip?</strong> Check browser console for errors</li>
+            <li><strong>Extension not loading?</strong> Check manifest.json and permissions</li>
+            <li><strong>API errors?</strong> Make sure backend server is running on localhost:8000</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>Console Debug Info</h2>
+        <p>Open DevTools (F12) and check the Console tab for any error messages.</p>
+        <button onclick="testExtension()">Test Extension Communication</button>
+        <div id="debug-output"></div>
+    </div>
+
+    <script>
+        function testExtension() {
+            const output = document.getElementById('debug-output');
+            output.innerHTML = '<p>Testing extension communication...</p>';
+            
+            // Test if chrome.runtime is available
+            if (typeof chrome !== 'undefined' && chrome.runtime) {
+                output.innerHTML += '<p>✅ Chrome runtime API is available</p>';
+                
+                // Test sending a message
+                try {
+                    chrome.runtime.sendMessage({type: 'TEST'}, (response) => {
+                        if (chrome.runtime.lastError) {
+                            output.innerHTML += '<p>❌ Extension communication error: ' + chrome.runtime.lastError.message + '</p>';
+                        } else {
+                            output.innerHTML += '<p>✅ Extension communication successful</p>';
+                        }
+                    });
+                } catch (error) {
+                    output.innerHTML += '<p>❌ Error sending message: ' + error.message + '</p>';
+                }
+            } else {
+                output.innerHTML += '<p>❌ Chrome runtime API not available</p>';
+            }
+        }
+
+        // Log when page loads
+        console.log('Debug test page loaded');
+        
+        // Check if content script is running
+        setTimeout(() => {
+            const floatBtn = document.getElementById('usersprompts-float-btn');
+            if (floatBtn) {
+                console.log('✅ Extension floating button found');
+            } else {
+                console.log('❌ Extension floating button not found');
+            }
+        }, 1000);
+    </script>
+</body>
+</html> 

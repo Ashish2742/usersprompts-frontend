@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrome Extension Debug & E2E Testing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-button:hover {
+            background: #005a87;
+        }
+        .test-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .success {
+            color: #28a745;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #0c5460;
+            background: #d1ecf1;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .log-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .test-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .test-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Chrome Extension Debug & E2E Testing</h1>
+    
+    <div class="test-section">
+        <h2>🔍 Environment Check</h2>
+        <button class="test-button" onclick="checkEnvironment()">Check Environment</button>
+        <div id="env-results"></div>
+    </div>
+
+    <div class="test-grid">
+        <div class="test-section">
+            <h2>🌐 Network Connectivity Tests</h2>
+            <button class="test-button" onclick="testBasicConnectivity()">Test Basic Connectivity</button>
+            <button class="test-button" onclick="testCORS()">Test CORS</button>
+            <button class="test-button" onclick="testSpecializations()">Test Specializations Endpoint</button>
+            <div id="network-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🚀 API Endpoint Tests</h2>
+            <button class="test-button" onclick="testOptimizeEndpoint()">Test Optimize Endpoint</button>
+            <button class="test-button" onclick="testScoreEndpoint()">Test Score Endpoint</button>
+            <button class="test-button" onclick="testBatchEndpoint()">Test Batch Endpoint</button>
+            <div id="api-results"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Extension API Service Tests</h2>
+        <textarea id="test-prompt" class="test-input" placeholder="Enter test prompt here..." rows="3">Write a professional email to a client about project delays</textarea>
+        <br>
+        <button class="test-button" onclick="testExtensionAPI()">Test Extension API Service</button>
+        <button class="test-button" onclick="testErrorHandling()">Test Error Handling</button>
+        <div id="extension-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Performance Tests</h2>
+        <button class="test-button" onclick="testPerformance()">Run Performance Tests</button>
+        <button class="test-button" onclick="testConcurrency()">Test Concurrent Requests</button>
+        <div id="performance-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔄 End-to-End Workflow Test</h2>
+        <button class="test-button" onclick="runE2ETest()">Run Complete E2E Test</button>
+        <div id="e2e-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Debug Logs</h2>
+        <button class="test-button" onclick="clearLogs()">Clear Logs</button>
+        <button class="test-button" onclick="exportLogs()">Export Logs</button>
+        <div id="debug-logs" class="log-container"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000/api/v1';
+        const logs = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            logs.push(logEntry);
+            
+            const logContainer = document.getElementById('debug-logs');
+            const logElement = document.createElement('div');
+            logElement.style.color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#495057';
+            logElement.textContent = logEntry;
+            logContainer.appendChild(logElement);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            console.log(logEntry);
+        }
+
+        function displayResult(elementId, content, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="${type}">${content}</div>`;
+        }
+
+        function clearLogs() {
+            document.getElementById('debug-logs').innerHTML = '';
+            logs.length = 0;
+        }
+
+        function exportLogs() {
+            const blob = new Blob([logs.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `extension-debug-logs-${new Date().toISOString().slice(0,19)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function checkEnvironment() {
+            log('Starting environment check...');
+            const results = [];
+            
+            // Check if running in extension context
+            const isExtension = typeof chrome !== 'undefined' && chrome.runtime;
+            results.push(`Extension Context: ${isExtension ? '✅ Yes' : '❌ No'}`);
+            
+            // Check localStorage
+            try {
+                localStorage.setItem('test', 'test');
+                localStorage.removeItem('test');
+                results.push('LocalStorage: ✅ Available');
+            } catch (e) {
+                results.push('LocalStorage: ❌ Not available');
+            }
+            
+            // Check fetch API
+            results.push(`Fetch API: ${typeof fetch !== 'undefined' ? '✅ Available' : '❌ Not available'}`);
+            
+            // Check current URL
+            results.push(`Current URL: ${window.location.href}`);
+            
+            // Check user agent
+            results.push(`User Agent: ${navigator.userAgent}`);
+            
+            displayResult('env-results', results.join('<br>'), 'info');
+            log('Environment check completed');
+        }
+
+        async function testBasicConnectivity() {
+            log('Testing basic connectivity...');
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch(API_BASE_URL + '/prompt-optimizer/specializations', {
+                    signal: controller.signal,
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    displayResult('network-results', `✅ Basic connectivity successful<br>Status: ${response.status}<br>Response: ${JSON.stringify(data, null, 2)}`, 'success');
+                    log('Basic connectivity test passed', 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                const errorMsg = `❌ Basic connectivity failed: ${error.message}`;
+                displayResult('network-results', errorMsg, 'error');
+                log(`Basic connectivity test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCORS() {
+            log('Testing CORS...');
+            try {
+                const response = await fetch(API_BASE_URL + '/prompt-optimizer/specializations', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': window.location.origin
+                    }
+                });
+                
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
+                };
+                
+                displayResult('network-results', `✅ CORS test successful<br>CORS Headers: ${JSON.stringify(corsHeaders, null, 2)}`, 'success');
+                log('CORS test passed', 'success');
+            } catch (error) {
+                displayResult('network-results', `❌ CORS test failed: ${error.message}`, 'error');
+                log(`CORS test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSpecializations() {
+            log('Testing specializations endpoint...');
+            try {
+                const response = await fetch(API_BASE_URL + '/prompt-optimizer/specializations');
+                const data = await response.json();
+                
+                if (response.ok && data.specialization_types) {
+                    displayResult('network-results', `✅ Specializations endpoint working<br>Types: ${data.specialization_types.join(', ')}`, 'success');
+                    log('Specializations endpoint test passed', 'success');
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                displayResult('network-results', `❌ Specializations test failed: ${error.message}`, 'error');
+                log(`Specializations test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testOptimizeEndpoint() {
+            log('Testing optimize endpoint...');
+            try {
+                const testData = {
+                    system_prompt: "Write a test email",
+                    optimization_focus: ["clarity", "specificity"]
+                };
+                
+                log(`Sending request: ${JSON.stringify(testData)}`);
+                
+                const response = await fetch(API_BASE_URL + '/prompt-optimizer/optimize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                log(`Response status: ${response.status}`);
+                log(`Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`Response data keys: ${Object.keys(data).join(', ')}`);
+                    displayResult('api-results', `✅ Optimize endpoint working<br>Original: ${data.original_prompt}<br>Optimized length: ${data.optimized_prompt?.length || 0} chars`, 'success');
+                    log('Optimize endpoint test passed', 'success');
+                } else {
+                    const errorData = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorData}`);
+                }
+            } catch (error) {
+                displayResult('api-results', `❌ Optimize endpoint failed: ${error.message}`, 'error');
+                log(`Optimize endpoint test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testScoreEndpoint() {
+            log('Testing score endpoint...');
+            try {
+                const response = await fetch(API_BASE_URL + '/prompt-scorer/score', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt: "Test prompt for scoring",
+                        criteria: ["clarity", "specificity", "completeness"]
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    displayResult('api-results', `✅ Score endpoint working<br>Overall score: ${data.overall_score || 'N/A'}`, 'success');
+                    log('Score endpoint test passed', 'success');
+                } else {
+                    const errorData = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorData}`);
+                }
+            } catch (error) {
+                displayResult('api-results', `❌ Score endpoint failed: ${error.message}`, 'error');
+                log(`Score endpoint test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testBatchEndpoint() {
+            log('Testing batch endpoint...');
+            try {
+                const response = await fetch(API_BASE_URL + '/prompt-optimizer/batch-optimize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        system_prompts: ["Test prompt 1", "Test prompt 2"],
+                        optimization_strategy: "balanced"
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    displayResult('api-results', `✅ Batch endpoint working<br>Results count: ${data.results?.length || 0}`, 'success');
+                    log('Batch endpoint test passed', 'success');
+                } else {
+                    const errorData = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorData}`);
+                }
+            } catch (error) {
+                displayResult('api-results', `❌ Batch endpoint failed: ${error.message}`, 'error');
+                log(`Batch endpoint test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testExtensionAPI() {
+            log('Testing extension API service...');
+            const prompt = document.getElementById('test-prompt').value;
+            
+            if (!prompt.trim()) {
+                displayResult('extension-results', '❌ Please enter a test prompt', 'error');
+                return;
+            }
+            
+            try {
+                // Simulate the extension's API service
+                const apiService = {
+                    async optimizePrompt(request) {
+                        log(`Extension API request: ${JSON.stringify(request)}`);
+                        
+                        const response = await fetch(API_BASE_URL + '/prompt-optimizer/optimize', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(request)
+                        });
+                        
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            log(`Extension API error response: ${errorText}`, 'error');
+                            throw new Error(`API Error (${response.status}): ${errorText}`);
+                        }
+                        
+                        const data = await response.json();
+                        log(`Extension API success: ${Object.keys(data).join(', ')}`);
+                        return data;
+                    }
+                };
+                
+                const result = await apiService.optimizePrompt({
+                    system_prompt: prompt,
+                    optimization_focus: ['clarity', 'specificity', 'completeness']
+                });
+                
+                displayResult('extension-results', `✅ Extension API test successful<br>Original: ${result.original_prompt}<br>Optimized: ${result.optimized_prompt.substring(0, 200)}...`, 'success');
+                log('Extension API test passed', 'success');
+                
+            } catch (error) {
+                displayResult('extension-results', `❌ Extension API test failed: ${error.message}`, 'error');
+                log(`Extension API test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testErrorHandling() {
+            log('Testing error handling...');
+            try {
+                // Test with invalid data
+                const response = await fetch(API_BASE_URL + '/prompt-optimizer/optimize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        // Missing required field
+                        optimization_focus: ['clarity']
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    displayResult('extension-results', `✅ Error handling working<br>Error: ${JSON.stringify(errorData.detail || errorData, null, 2)}`, 'success');
+                    log('Error handling test passed - server properly returned error', 'success');
+                } else {
+                    displayResult('extension-results', '❌ Error handling failed - server should have returned error', 'error');
+                    log('Error handling test failed - expected error but got success', 'error');
+                }
+            } catch (error) {
+                displayResult('extension-results', `❌ Error handling test failed: ${error.message}`, 'error');
+                log(`Error handling test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPerformance() {
+            log('Running performance tests...');
+            const results = [];
+            
+            try {
+                // Test response time
+                const start = performance.now();
+                const response = await fetch(API_BASE_URL + '/prompt-optimizer/specializations');
+                const end = performance.now();
+                const responseTime = end - start;
+                
+                results.push(`Response time: ${responseTime.toFixed(2)}ms`);
+                
+                // Test payload size
+                const data = await response.json();
+                const payloadSize = JSON.stringify(data).length;
+                results.push(`Payload size: ${payloadSize} bytes`);
+                
+                displayResult('performance-results', `✅ Performance test completed<br>${results.join('<br>')}`, 'success');
+                log(`Performance test completed: ${results.join(', ')}`, 'success');
+                
+            } catch (error) {
+                displayResult('performance-results', `❌ Performance test failed: ${error.message}`, 'error');
+                log(`Performance test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testConcurrency() {
+            log('Testing concurrent requests...');
+            try {
+                const promises = [];
+                for (let i = 0; i < 3; i++) {
+                    promises.push(
+                        fetch(API_BASE_URL + '/prompt-optimizer/specializations')
+                    );
+                }
+                
+                const responses = await Promise.all(promises);
+                const allSuccessful = responses.every(r => r.ok);
+                
+                if (allSuccessful) {
+                    displayResult('performance-results', `✅ Concurrency test passed<br>3 concurrent requests successful`, 'success');
+                    log('Concurrency test passed', 'success');
+                } else {
+                    throw new Error('Some concurrent requests failed');
+                }
+            } catch (error) {
+                displayResult('performance-results', `❌ Concurrency test failed: ${error.message}`, 'error');
+                log(`Concurrency test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function runE2ETest() {
+            log('Starting End-to-End test...');
+            const testSteps = [];
+            
+            try {
+                // Step 1: Check connectivity
+                log('E2E Step 1: Testing connectivity...');
+                const connectResponse = await fetch(API_BASE_URL + '/prompt-optimizer/specializations');
+                if (!connectResponse.ok) throw new Error('Connectivity check failed');
+                testSteps.push('✅ Connectivity check');
+                
+                // Step 2: Test optimization
+                log('E2E Step 2: Testing optimization...');
+                const optimizeResponse = await fetch(API_BASE_URL + '/prompt-optimizer/optimize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_prompt: "Write a professional email",
+                        optimization_focus: ["clarity", "specificity"]
+                    })
+                });
+                if (!optimizeResponse.ok) throw new Error('Optimization failed');
+                const optimizeData = await optimizeResponse.json();
+                testSteps.push('✅ Prompt optimization');
+                
+                // Step 3: Validate response structure
+                log('E2E Step 3: Validating response structure...');
+                const requiredFields = ['original_prompt', 'optimized_prompt', 'scores'];
+                const missingFields = requiredFields.filter(field => !optimizeData[field]);
+                if (missingFields.length > 0) {
+                    throw new Error(`Missing fields: ${missingFields.join(', ')}`);
+                }
+                testSteps.push('✅ Response validation');
+                
+                displayResult('e2e-results', `✅ E2E Test PASSED<br>${testSteps.join('<br>')}`, 'success');
+                log('End-to-End test completed successfully', 'success');
+                
+            } catch (error) {
+                displayResult('e2e-results', `❌ E2E Test FAILED<br>Steps completed: ${testSteps.length}<br>Error: ${error.message}`, 'error');
+                log(`End-to-End test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run environment check on page load
+        window.addEventListener('load', () => {
+            checkEnvironment();
+            log('Debug page loaded and ready for testing');
+        });
+    </script>
+</body>
+</html> 

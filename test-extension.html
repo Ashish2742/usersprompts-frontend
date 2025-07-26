@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UsersPrompts Extension Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2563eb;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #374151;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-family: inherit;
+            resize: vertical;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 UsersPrompts Extension Test Page</h1>
+        
+        <div class="status info">
+            <strong>Instructions:</strong> This page helps test the UsersPrompts Chrome extension. 
+            Make sure the extension is loaded and the API server is running at localhost:8000.
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Test Prompt Input</h3>
+            <p>Enter a test prompt below to verify the extension functionality:</p>
+            <textarea id="testPrompt" placeholder="Enter a test prompt here...">You are an AI assistant. Help users with their questions.</textarea>
+            <br>
+            <button onclick="testOptimization()">Test Optimization</button>
+            <button onclick="testConnection()">Test API Connection</button>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Extension Status</h3>
+            <div id="extensionStatus" class="status error">
+                Checking extension status...
+            </div>
+            <button onclick="checkExtensionStatus()">Refresh Status</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="testResults">
+                <p>No tests run yet. Click the test buttons above to see results.</p>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🐛 Debug Information</h3>
+            <div id="debugInfo">
+                <p><strong>Page URL:</strong> <span id="pageUrl"></span></p>
+                <p><strong>Extension ID:</strong> <span id="extensionId">Unknown</span></p>
+                <p><strong>API Server:</strong> <span id="apiStatus">Checking...</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set page URL
+        document.getElementById('pageUrl').textContent = window.location.href;
+
+        // Check extension status
+        function checkExtensionStatus() {
+            const statusDiv = document.getElementById('extensionStatus');
+            
+            // Check if extension is available
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
+                document.getElementById('extensionId').textContent = chrome.runtime.id;
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = '<strong>✅ Extension Loaded</strong><br>Extension ID: ' + chrome.runtime.id;
+            } else {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = '<strong>❌ Extension Not Found</strong><br>Make sure the extension is installed and enabled.';
+            }
+        }
+
+        // Test API connection
+        async function testConnection() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<p>Testing API connection...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/prompt-optimizer/specializations');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('apiStatus').textContent = '✅ Connected';
+                    resultsDiv.innerHTML = `
+                        <div class="status success">
+                            <strong>✅ API Connection Successful</strong><br>
+                            Server is running and responding correctly.<br>
+                            Available specializations: ${data.specialization_types.join(', ')}
+                        </div>
+                    `;
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                document.getElementById('apiStatus').textContent = '❌ Not Connected';
+                resultsDiv.innerHTML = `
+                    <div class="status error">
+                        <strong>❌ API Connection Failed</strong><br>
+                        Error: ${error.message}<br>
+                        Make sure the API server is running at localhost:8000
+                    </div>
+                `;
+            }
+        }
+
+        // Test optimization
+        async function testOptimization() {
+            const prompt = document.getElementById('testPrompt').value;
+            const resultsDiv = document.getElementById('testResults');
+            
+            if (!prompt.trim()) {
+                resultsDiv.innerHTML = '<div class="status error"><strong>❌ No Prompt</strong><br>Please enter a test prompt first.</div>';
+                return;
+            }
+            
+            resultsDiv.innerHTML = '<p>Testing optimization...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/prompt-optimizer/optimize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        system_prompt: prompt,
+                        optimization_focus: ['clarity', 'specificity', 'completeness']
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultsDiv.innerHTML = `
+                        <div class="status success">
+                            <strong>✅ Optimization Successful</strong><br>
+                            Original prompt: ${prompt.substring(0, 50)}...<br>
+                            Optimized prompt: ${data.optimized_prompt.substring(0, 100)}...<br>
+                            Overall score: ${data.scores?.optimized?.overall || 'N/A'}
+                        </div>
+                    `;
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="status error">
+                        <strong>❌ Optimization Failed</strong><br>
+                        Error: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize page
+        window.onload = function() {
+            checkExtensionStatus();
+            testConnection();
+        };
+    </script>
+</body>
+</html> 
