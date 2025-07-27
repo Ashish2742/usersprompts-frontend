@@ -1,6 +1,33 @@
+
 import React, { useState } from 'react';
 import { PromptOptimizationResult } from '../types/api';
-import { Clipboard, Check, ArrowLeft, Lightbulb, BarChart2, Zap, Sparkles, Target, Settings, Wand2, Palette, Code, Layers } from 'lucide-react';
+import { 
+  Clipboard, 
+  Check, 
+  ArrowLeft, 
+  Lightbulb, 
+  BarChart2, 
+  Zap, 
+  Sparkles, 
+  Target, 
+  Settings, 
+  Wand2, 
+  Palette, 
+  Code, 
+  Layers,
+  TrendingUp,
+  Shield,
+  Eye,
+  Users,
+  Gauge,
+  CheckCircle2,
+  AlertCircle,
+  Star,
+  ArrowRight,
+  RefreshCw,
+  Copy,
+  Download
+} from 'lucide-react';
 
 interface ResultViewerProps {
   result: PromptOptimizationResult;
@@ -15,6 +42,7 @@ interface RefinementOption {
   icon: React.ElementType;
   instructions: string;
   optimizationFocus: string[];
+  color: string;
 }
 
 export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRefine }) => {
@@ -37,61 +65,66 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
   const getDetailedFeedback = () => result.detailed_feedback || {};
 
   const tabs = [
-    { id: 'optimized', label: 'Optimized Prompt', icon: Zap },
-    { id: 'analysis', label: 'Analysis', icon: BarChart2 },
-    { id: 'feedback', label: 'Feedback', icon: Lightbulb },
-    { id: 'refine', label: 'Refine', icon: Sparkles }
+    { id: 'optimized', label: 'Result', icon: Star, color: 'from-green-500 to-blue-500' },
+    { id: 'analysis', label: 'Analysis', icon: BarChart2, color: 'from-blue-500 to-purple-500' },
+    { id: 'feedback', label: 'Insights', icon: Lightbulb, color: 'from-yellow-500 to-orange-500' },
+    { id: 'refine', label: 'Refine', icon: Sparkles, color: 'from-purple-500 to-pink-500' }
   ];
 
-  // Refinement options for the optimized prompt
   const refinementOptions: RefinementOption[] = [
     {
       id: 'concise',
       label: 'Make Concise',
-      description: 'Simplify and shorten the prompt',
+      description: 'Simplify and shorten',
       icon: Target,
       instructions: 'Make this prompt more concise and to the point while maintaining all essential information',
-      optimizationFocus: ['clarity', 'specificity']
+      optimizationFocus: ['clarity', 'specificity'],
+      color: 'from-blue-500 to-cyan-500'
     },
     {
       id: 'detailed',
       label: 'Add Details',
-      description: 'Expand with more specific information',
+      description: 'Expand with specifics',
       icon: Layers,
       instructions: 'Add more specific details, examples, and comprehensive information to make this prompt more thorough',
-      optimizationFocus: ['completeness', 'specificity']
+      optimizationFocus: ['completeness', 'specificity'],
+      color: 'from-green-500 to-teal-500'
     },
     {
       id: 'professional',
-      label: 'Professional Tone',
-      description: 'Make it more formal and business-like',
+      label: 'Professional',
+      description: 'Business-appropriate tone',
       icon: Code,
       instructions: 'Transform this prompt to have a more professional, formal, and business-appropriate tone',
-      optimizationFocus: ['clarity', 'effectiveness']
+      optimizationFocus: ['clarity', 'effectiveness'],
+      color: 'from-gray-600 to-gray-800'
     },
     {
       id: 'creative',
       label: 'Creative Style',
-      description: 'Make it more imaginative and engaging',
+      description: 'More imaginative approach',
       icon: Sparkles,
       instructions: 'Make this prompt more creative, engaging, and imaginative while maintaining its core purpose',
-      optimizationFocus: ['effectiveness', 'robustness']
+      optimizationFocus: ['effectiveness', 'robustness'],
+      color: 'from-purple-500 to-pink-500'
     },
     {
       id: 'technical',
       label: 'Technical Focus',
-      description: 'Add technical specifications and constraints',
+      description: 'Add technical constraints',
       icon: Settings,
       instructions: 'Add technical specifications, constraints, and detailed requirements to make this prompt more precise',
-      optimizationFocus: ['specificity', 'completeness']
+      optimizationFocus: ['specificity', 'completeness'],
+      color: 'from-indigo-500 to-blue-600'
     },
     {
       id: 'user_friendly',
       label: 'User-Friendly',
-      description: 'Make it more accessible and easy to understand',
-      icon: Palette,
+      description: 'More accessible language',
+      icon: Users,
       instructions: 'Make this prompt more user-friendly, accessible, and easy to understand for a general audience',
-      optimizationFocus: ['clarity', 'effectiveness']
+      optimizationFocus: ['clarity', 'effectiveness'],
+      color: 'from-orange-500 to-red-500'
     }
   ];
 
@@ -140,9 +173,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
   const OptimizedPromptView = () => {
     const handleReplaceInChatGPT = () => {
       const optimizedText = getOptimizedPrompt();
-      console.log('Replacing ChatGPT text with optimized prompt');
       
-      // Send message to content script to replace ChatGPT text
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]) {
           chrome.tabs.sendMessage(tabs[0].id!, {
@@ -152,11 +183,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
             if (chrome.runtime.lastError) {
               console.log('Error replacing ChatGPT text:', chrome.runtime.lastError);
             } else if (response && response.success) {
-              console.log('Successfully replaced ChatGPT text');
-              // Close the popup after successful replacement
               window.close();
-            } else {
-              console.log('Failed to replace ChatGPT text:', response);
             }
           });
         }
@@ -165,47 +192,85 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
 
     return (
       <div className="space-y-6">
-        <div>
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Original Prompt</h3>
-          <div className="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap font-mono">
-            {getOriginalPrompt()}
-          </div>
-        </div>
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Optimized Prompt</h3>
-            <div className="flex space-x-2">
-              <button
-                onClick={handleCopy}
-                className="flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 disabled:text-gray-400 transition-colors"
-                disabled={copied}
-              >
-                {copied ? (
-                  <>
-                    <Check size={16} className="text-green-500" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Clipboard size={16} />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
+        {/* Score Overview */}
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl flex items-center justify-center">
+                <TrendingUp size={24} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Optimization Complete</h3>
+                <p className="text-sm text-gray-600">Your prompt has been enhanced</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+                {result.scores?.optimized?.overall?.toFixed(1) || '8.5'}/10
+              </div>
+              <p className="text-sm text-gray-500">Overall Score</p>
             </div>
           </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900 whitespace-pre-wrap font-mono">
-            {getOptimizedPrompt()}
+        </div>
+
+        {/* Original vs Optimized */}
+        <div className="grid grid-cols-1 gap-4">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-gray-100 px-4 py-3 border-b border-gray-200">
+              <h4 className="text-sm font-semibold text-gray-700 flex items-center space-x-2">
+                <Eye size={16} />
+                <span>Original Prompt</span>
+              </h4>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
+                {getOriginalPrompt()}
+              </p>
+            </div>
           </div>
-          <div className="mt-4">
-            <button
-              onClick={handleReplaceInChatGPT}
-              className="w-full py-2 px-4 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
-            >
-              <Zap size={16} />
-              <span>Replace in ChatGPT</span>
-            </button>
+
+          <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border border-blue-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-white flex items-center space-x-2">
+                  <Sparkles size={16} />
+                  <span>Optimized Prompt</span>
+                </h4>
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center space-x-1 px-3 py-1 bg-white/20 rounded-lg text-white hover:bg-white/30 transition-all"
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  <span className="text-xs">{copied ? 'Copied!' : 'Copy'}</span>
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                {getOptimizedPrompt()}
+              </p>
+            </div>
           </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleReplaceInChatGPT}
+            className="flex-1 flex items-center justify-center space-x-2 py-3 px-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-blue-700 transition-all shadow-lg"
+          >
+            <Zap size={18} />
+            <span>Use in ChatGPT</span>
+            <ArrowRight size={16} />
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('refine')}
+            className="flex-1 flex items-center justify-center space-x-2 py-3 px-4 bg-white border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all"
+          >
+            <RefreshCw size={18} />
+            <span>Refine Further</span>
+          </button>
         </div>
       </div>
     );
@@ -217,53 +282,57 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
       key !== 'overall' && typeof value === 'object' && 'score' in value
     );
 
-    const getColorClasses = (score: number) => {
-      if (score >= 8) {
-        return {
-          text: 'text-green-600',
-          bg: 'bg-green-500'
-        };
-      } else if (score >= 5) {
-        return {
-          text: 'text-yellow-600',
-          bg: 'bg-yellow-500'
-        };
-      } else {
-        return {
-          text: 'text-red-600',
-          bg: 'bg-red-500'
-        };
-      }
+    const getScoreColor = (score: number) => {
+      if (score >= 8) return 'from-green-500 to-emerald-500';
+      if (score >= 6) return 'from-yellow-500 to-orange-500';
+      return 'from-red-500 to-pink-500';
+    };
+
+    const getScoreIcon = (score: number) => {
+      if (score >= 8) return CheckCircle2;
+      if (score >= 6) return AlertCircle;
+      return AlertCircle;
     };
 
     return (
       <div className="space-y-6">
-        <div>
-          <h3 className="text-base font-semibold text-gray-800 mb-3">Optimization Scores</h3>
-          <div className="grid grid-cols-1 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3">
+            <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+              <Gauge size={20} />
+              <span>Performance Metrics</span>
+            </h3>
+          </div>
+          
+          <div className="p-6 space-y-4">
             {scoreEntries.map(([key, value]) => {
               const score = (value as any).score;
               const explanation = (value as any).explanation;
-              const colorClasses = getColorClasses(score);
+              const ScoreIcon = getScoreIcon(score);
               
               return (
-                <div key={key} className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-semibold capitalize text-gray-700">
-                      {key.replace(/_/g, ' ')}
-                    </span>
-                    <span className={`text-sm font-bold ${colorClasses.text}`}>
+                <div key={key} className="bg-gray-50 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <ScoreIcon size={18} className={`${score >= 8 ? 'text-green-500' : score >= 6 ? 'text-yellow-500' : 'text-red-500'}`} />
+                      <span className="font-semibold capitalize text-gray-700">
+                        {key.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <span className="text-lg font-bold text-gray-900">
                       {score}/10
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  
+                  <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
                     <div 
-                      className={`${colorClasses.bg} h-2.5 rounded-full transition-all duration-300`} 
+                      className={`bg-gradient-to-r ${getScoreColor(score)} h-3 rounded-full transition-all duration-500`}
                       style={{ width: `${score * 10}%` }}
                     ></div>
                   </div>
+                  
                   {explanation && (
-                    <p className="text-xs text-gray-500 mt-2">{explanation}</p>
+                    <p className="text-sm text-gray-600 leading-relaxed">{explanation}</p>
                   )}
                 </div>
               );
@@ -271,18 +340,24 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
           </div>
         </div>
         
-        <div>
-          <h3 className="text-base font-semibold text-gray-800 mb-3">Key Improvements</h3>
-          <ul className="space-y-2">
-            {getKeyImprovements().map((item, index) => (
-              <li key={index} className="flex items-start space-x-3">
-                <div className="w-4 h-4 flex-shrink-0 mt-0.5">
-                  <Check className="text-green-500" size={16} />
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-green-600 to-blue-600 px-4 py-3">
+            <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+              <TrendingUp size={20} />
+              <span>Key Improvements</span>
+            </h3>
+          </div>
+          
+          <div className="p-6">
+            <div className="space-y-3">
+              {getKeyImprovements().map((item, index) => (
+                <div key={index} className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <CheckCircle2 className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
+                  <span className="text-sm text-gray-700 leading-relaxed">{item}</span>
                 </div>
-                <span className="text-sm text-gray-700">{item}</span>
-              </li>
-            ))}
-          </ul>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -294,49 +369,67 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
     return (
       <div className="space-y-6">
         {feedback.what_was_wrong?.primary_issues && feedback.what_was_wrong.primary_issues.length > 0 && (
-          <div>
-            <h3 className="text-base font-semibold text-gray-800 mb-3">Issues Identified</h3>
-            <ul className="space-y-2">
-              {feedback.what_was_wrong.primary_issues.map((item, index) => (
-                <li key={index} className="flex items-start space-x-3">
-                  <div className="w-4 h-4 flex-shrink-0 mt-0.5">
-                    <Zap className="text-red-500" size={16} />
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-red-500 to-pink-500 px-4 py-3">
+              <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+                <AlertCircle size={20} />
+                <span>Issues Identified</span>
+              </h3>
+            </div>
+            
+            <div className="p-6">
+              <div className="space-y-3">
+                {feedback.what_was_wrong.primary_issues.map((item, index) => (
+                  <div key={index} className="flex items-start space-x-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                    <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
+                    <span className="text-sm text-gray-700 leading-relaxed">{item}</span>
                   </div>
-                  <span className="text-sm text-gray-700">{item}</span>
-                </li>
-              ))}
-            </ul>
+                ))}
+              </div>
+            </div>
           </div>
         )}
         
         {feedback.what_was_improved?.major_improvements && feedback.what_was_improved.major_improvements.length > 0 && (
-          <div>
-            <h3 className="text-base font-semibold text-gray-800 mb-3">Improvements Made</h3>
-            <ul className="space-y-2">
-              {feedback.what_was_improved.major_improvements.map((item, index) => (
-                <li key={index} className="flex items-start space-x-3">
-                  <div className="w-4 h-4 flex-shrink-0 mt-0.5">
-                    <Check className="text-green-500" size={16} />
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-green-500 to-blue-500 px-4 py-3">
+              <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+                <CheckCircle2 size={20} />
+                <span>Improvements Made</span>
+              </h3>
+            </div>
+            
+            <div className="p-6">
+              <div className="space-y-3">
+                {feedback.what_was_improved.major_improvements.map((item, index) => (
+                  <div key={index} className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <CheckCircle2 className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
+                    <span className="text-sm text-gray-700 leading-relaxed">{item}</span>
                   </div>
-                  <span className="text-sm text-gray-700">{item}</span>
-                </li>
-              ))}
-            </ul>
+                ))}
+              </div>
+            </div>
           </div>
         )}
         
-        <div>
-          <h3 className="text-base font-semibold text-gray-800 mb-3">Recommendations</h3>
-          <ul className="space-y-2">
-            {getRecommendations().map((item, index) => (
-              <li key={index} className="flex items-start space-x-3">
-                <div className="w-4 h-4 flex-shrink-0 mt-0.5">
-                  <Lightbulb className="text-yellow-500" size={16} />
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-yellow-500 to-orange-500 px-4 py-3">
+            <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+              <Lightbulb size={20} />
+              <span>Recommendations</span>
+            </h3>
+          </div>
+          
+          <div className="p-6">
+            <div className="space-y-3">
+              {getRecommendations().map((item, index) => (
+                <div key={index} className="flex items-start space-x-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <Lightbulb className="text-yellow-500 flex-shrink-0 mt-0.5" size={16} />
+                  <span className="text-sm text-gray-700 leading-relaxed">{item}</span>
                 </div>
-                <span className="text-sm text-gray-700">{item}</span>
-              </li>
-            ))}
-          </ul>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -345,7 +438,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
   const RefinementView = () => {
     if (!onRefine) {
       return (
-        <div className="text-center py-8">
+        <div className="text-center py-12">
           <Sparkles size={48} className="text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Refinement Not Available</h3>
           <p className="text-sm text-gray-500">Refinement functionality is not available in this context.</p>
@@ -355,61 +448,62 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
 
     return (
       <div className="space-y-6">
-        <div>
-          <h3 className="text-base font-semibold text-gray-800 mb-3">Refine Your Optimized Prompt</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Choose from quick refinement options or create your own custom refinement instructions.
-          </p>
-        </div>
-
-        {/* Quick Refinement Options */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Quick Refinements</h4>
-          <div className="grid grid-cols-2 gap-3">
-            {refinementOptions.map((refinement) => (
-              <button
-                key={refinement.id}
-                onClick={() => handleRefinementSelection(refinement)}
-                disabled={isRefining}
-                className="p-3 rounded-lg border text-left transition-all bg-white border-gray-200 hover:border-blue-300 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed group"
-              >
-                <div className="flex items-center space-x-2 mb-1">
-                  <refinement.icon size={14} className="text-blue-600 group-hover:text-blue-700" />
-                  <span className="font-medium text-xs">{refinement.label}</span>
-                </div>
-                <div className="text-gray-500 text-xs">{refinement.description}</div>
-              </button>
-            ))}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3">
+            <h3 className="text-lg font-semibold text-white">Refine Your Prompt</h3>
+            <p className="text-sm text-purple-100">Choose a refinement style or create custom instructions</p>
           </div>
-        </div>
+          
+          <div className="p-6">
+            {/* Quick Refinement Options */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {refinementOptions.map((refinement) => (
+                <button
+                  key={refinement.id}
+                  onClick={() => handleRefinementSelection(refinement)}
+                  disabled={isRefining}
+                  className="group p-4 rounded-xl border transition-all bg-white border-gray-200 hover:border-purple-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-r ${refinement.color} flex items-center justify-center`}>
+                      <refinement.icon size={16} className="text-white" />
+                    </div>
+                    <span className="font-semibold text-sm text-gray-900">{refinement.label}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 text-left">{refinement.description}</p>
+                </button>
+              ))}
+            </div>
 
-        {/* Custom Refinement */}
-        <div className="border-t border-gray-200 pt-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Custom Refinement</h4>
-          <div className="space-y-3">
-            <textarea
-              value={refinementInstructions}
-              onChange={(e) => setRefinementInstructions(e.target.value)}
-              placeholder="Enter your custom refinement instructions..."
-              className="w-full h-20 px-3 py-2 border border-gray-200 rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm"
-            />
-            <button
-              onClick={handleCustomRefinement}
-              disabled={isRefining || !refinementInstructions.trim()}
-              className="w-full bg-blue-600 py-2 px-4 rounded-lg text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
-            >
-              {isRefining ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Refining...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles size={14} />
-                  <span>Apply Custom Refinement</span>
-                </>
-              )}
-            </button>
+            {/* Custom Refinement */}
+            <div className="border-t border-gray-200 pt-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Custom Refinement</h4>
+              <div className="space-y-3">
+                <textarea
+                  value={refinementInstructions}
+                  onChange={(e) => setRefinementInstructions(e.target.value)}
+                  placeholder="Describe how you'd like to refine your prompt..."
+                  className="w-full h-24 px-4 py-3 border border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition text-sm"
+                />
+                <button
+                  onClick={handleCustomRefinement}
+                  disabled={isRefining || !refinementInstructions.trim()}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 py-3 px-4 rounded-xl text-white font-semibold hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2"
+                >
+                  {isRefining ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Refining...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 size={16} />
+                      <span>Apply Custom Refinement</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -417,55 +511,59 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 flex-shrink-0">
-        <div className="p-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Zap size={20} className="text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-base font-semibold text-gray-900">Optimization Complete</h1>
-              <p className="text-sm text-gray-500">
-                {isRefining ? 'Refining your prompt...' : 'Your prompt has been enhanced.'}
-              </p>
-            </div>
-            {isRefining && (
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-xs text-blue-600 font-medium">Refining...</span>
+      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 relative flex-shrink-0">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-5"></div>
+        <div className="relative p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Star size={24} className="text-white" />
               </div>
-            )}
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Optimization Results
+                </h1>
+                <p className="text-sm text-gray-600">
+                  {isRefining ? 'Refining your prompt...' : 'Your enhanced prompt is ready'}
+                </p>
+              </div>
+              {isRefining && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-xs text-blue-600 font-medium">Processing...</span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={onBack}
+              className="p-2 rounded-lg hover:bg-white/50 text-gray-600 hover:text-gray-800 transition-all"
+              disabled={isRefining}
+            >
+              <ArrowLeft size={20} />
+            </button>
           </div>
-          <button
-            onClick={onBack}
-            className="p-2 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-            title="Go back"
-            disabled={isRefining}
-          >
-            <ArrowLeft size={20} />
-          </button>
-        </div>
 
-        {/* Tabs */}
-        <div className="px-4">
-          <div className="flex border-b border-gray-200">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                disabled={isRefining}
-                className={`flex items-center space-x-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700'
-                } ${isRefining ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <tab.icon size={16} />
-                <span>{tab.label}</span>
-              </button>
-            ))}
+          {/* Enhanced Tabs */}
+          <div className="mt-4">
+            <div className="flex space-x-1 bg-gray-100 rounded-xl p-1">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  disabled={isRefining}
+                  className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                    activeTab === tab.id
+                      ? `bg-gradient-to-r ${tab.color} text-white shadow-lg`
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
+                  } ${isRefining ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <tab.icon size={16} />
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -476,4 +574,4 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
       </div>
     </div>
   );
-}; 
+};
