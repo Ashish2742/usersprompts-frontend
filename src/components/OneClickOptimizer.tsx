@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
-import { ResultViewer } from './ResultViewer';
 import { PromptOptimizationResult } from '../types/api';
+import { FileText, Loader2, Zap, Sparkles, Copy, ArrowRight, CheckCircle, AlertCircle, RefreshCw, History, Settings, Wand2, Target, Layers, Code, Palette, Users, Lightbulb } from 'lucide-react';
+import DynamicRefinement from './DynamicRefinement';
 
 interface OneClickOptimizerProps {
   initialText?: string;
+  onResult?: (result: PromptOptimizationResult) => void;
 }
 
 interface OptimizationHistoryItem {
@@ -12,47 +14,51 @@ interface OptimizationHistoryItem {
   prompt: string;
   score: number;
   timestamp: Date;
+  refinementType?: string;
+  analysis?: any;
 }
 
-const OneClickOptimizer: React.FC<OneClickOptimizerProps> = ({ initialText = '' }) => {
+interface AdvancedRefinementOption {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  instruction: string;
+  category: string;
+  color: string;
+}
+
+const OneClickOptimizer: React.FC<OneClickOptimizerProps> = ({ initialText = '', onResult }) => {
   const [currentPrompt, setCurrentPrompt] = useState(initialText);
   const [optimizationHistory, setOptimizationHistory] = useState<OptimizationHistoryItem[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [currentIteration, setCurrentIteration] = useState(0);
-  const [refinementInstructions, setRefinementInstructions] = useState('');
   const [error, setError] = useState<string>('');
-  const [showHistory, setShowHistory] = useState(false);
-  const [result, setResult] = useState<PromptOptimizationResult | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showAdvancedRefinements, setShowAdvancedRefinements] = useState(false);
+  const [customRefinement, setCustomRefinement] = useState('');
 
   useEffect(() => {
     if (initialText) {
       setCurrentPrompt(initialText);
     }
-    // Test connection on mount
     testConnection();
   }, [initialText]);
 
   const testConnection = async () => {
     try {
-      console.log('Testing connection to API...');
       const response = await apiService.testConnection();
-      console.log('Connection test result:', response);
       setIsConnected(response);
       if (response) {
-        setError(''); // Clear any previous errors
-        console.log('✅ API connection successful');
+        setError('');
       } else {
         setError('API server is not responding. Please check if the server is running on localhost:8000');
-        console.log('❌ API connection failed');
       }
     } catch (error: any) {
-      console.error('Connection test error:', error);
       setIsConnected(false);
-      const errorMessage = typeof error === 'string' ? error : 
-                          error?.message || 
-                          (error && typeof error === 'object' ? JSON.stringify(error) : 'Unknown connection error');
-      setError(`Connection failed: ${errorMessage}`);
+      setError(`Connection failed: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -64,46 +70,53 @@ const OneClickOptimizer: React.FC<OneClickOptimizerProps> = ({ initialText = '' 
     
     setIsOptimizing(true);
     setError('');
-    console.log('🚀 Starting optimization process...');
 
     try {
-      console.log('Sending optimization request with prompt:', currentPrompt.trim());
-      
       const response = await apiService.optimizePrompt({
         system_prompt: currentPrompt.trim(),
         optimization_focus: ['clarity', 'specificity', 'completeness']
       });
       
-      console.log('✅ Optimization successful!');
-      console.log('Response keys:', Object.keys(response));
+      if (!response.optimized_prompt) {
+        throw new Error('Invalid response: missing optimized_prompt');
+      }
       
-      setResult(response);
+      if (onResult) {
+        onResult(response);
+      }
+      
       setCurrentIteration(prev => prev + 1);
       
-      // Add to history
       const historyItem: OptimizationHistoryItem = {
         iteration: currentIteration + 1,
         prompt: response.optimized_prompt,
         score: response.scores?.optimized?.overall || 7.0,
-        timestamp: new Date()
+        timestamp: new Date(),
+        refinementType: 'initial_optimization',
+        analysis: response.optimization_analysis
       };
       
       setOptimizationHistory(prev => [historyItem, ...prev]);
       
     } catch (error: any) {
-      console.error('❌ Optimization failed:', error);
-      
-      // Improved error message handling
       let errorMessage = 'Optimization failed';
       
-      if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error?.message) {
-        errorMessage = error.message;
+      if (error?.message) {
+        if (error.message.includes('429') || error.message.includes('quota') || error.message.includes('exceeded')) {
+          errorMessage = 'API quota exceeded. The free tier allows 50 requests per day. Please try again tomorrow or upgrade your plan.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out. Please check if the server is running and try again.';
+        } else {
+          errorMessage = error.message;
+        }
       } else if (error && typeof error === 'object') {
-        // Handle different error object structures
         if (error.response?.data) {
-          errorMessage = `Server error: ${JSON.stringify(error.response.data)}`;
+          const responseData = error.response.data;
+          if (responseData.includes('429') || responseData.includes('quota') || responseData.includes('exceeded')) {
+            errorMessage = 'API quota exceeded. The free tier allows 50 requests per day. Please try again tomorrow or upgrade your plan.';
+          } else {
+            errorMessage = `Server error: ${JSON.stringify(responseData)}`;
+          }
         } else if (error.request) {
           errorMessage = 'No response from server. Please check if the API server is running.';
         } else {
@@ -112,22 +125,13 @@ const OneClickOptimizer: React.FC<OneClickOptimizerProps> = ({ initialText = '' 
       }
       
       setError(errorMessage);
-      console.log('Error details:', {
-        type: typeof error,
-        message: error?.message,
-        stack: error?.stack,
-        response: error?.response,
-        request: error?.request
-      });
-      
-      // Re-test connection if optimization fails
       await testConnection();
     } finally {
       setIsOptimizing(false);
     }
   };
 
-  const handleRefine = async (instructions: string) => {
+  const handleRefine = async (instructions: string, refinementType: string = 'custom') => {
     if (!currentPrompt.trim() || !instructions.trim()) {
       setError('Please provide both a prompt and refinement instructions');
       return;
@@ -135,37 +139,34 @@ const OneClickOptimizer: React.FC<OneClickOptimizerProps> = ({ initialText = '' 
     
     setIsOptimizing(true);
     setError('');
-    console.log('🔄 Starting refinement process...');
 
     try {
       const refinedPrompt = `${currentPrompt}\n\nRefinement instructions: ${instructions}`;
-      console.log('Sending refinement request...');
       
       const response = await apiService.optimizePrompt({
         system_prompt: refinedPrompt,
         optimization_focus: ['clarity', 'specificity', 'completeness']
       });
       
-      console.log('✅ Refinement successful!');
+      if (onResult) {
+        onResult(response);
+      }
       
-      setResult(response);
       setCurrentPrompt(response.optimized_prompt);
       setCurrentIteration(prev => prev + 1);
       
-      // Add to history
       const historyItem: OptimizationHistoryItem = {
         iteration: currentIteration + 1,
         prompt: response.optimized_prompt,
         score: response.scores?.optimized?.overall || 7.0,
-        timestamp: new Date()
+        timestamp: new Date(),
+        refinementType: refinementType,
+        analysis: response.optimization_analysis
       };
       
       setOptimizationHistory(prev => [historyItem, ...prev]);
       
     } catch (error: any) {
-      console.error('❌ Refinement failed:', error);
-      
-      // Improved error message handling (same as above)
       let errorMessage = 'Refinement failed';
       
       if (typeof error === 'string') {
@@ -183,74 +184,129 @@ const OneClickOptimizer: React.FC<OneClickOptimizerProps> = ({ initialText = '' 
       }
       
       setError(errorMessage);
-      
-      // Re-test connection if refinement fails
       await testConnection();
     } finally {
       setIsOptimizing(false);
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      console.log('✅ Text copied to clipboard');
-    }).catch((err) => {
-      console.error('❌ Failed to copy text:', err);
-    });
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
   };
 
   const resetOptimization = () => {
-    console.log('🔄 Resetting optimization...');
     setCurrentPrompt(initialText);
     setOptimizationHistory([]);
     setCurrentIteration(0);
-    setResult(null);
     setError('');
+    setCustomRefinement('');
   };
 
-  const quickRefinements = [
-    { label: 'Make it more concise', instructions: 'Make this prompt more concise and to the point' },
-    { label: 'Add more detail', instructions: 'Add more specific details and examples' },
-    { label: 'Improve clarity', instructions: 'Make this prompt clearer and easier to understand' },
-    { label: 'Add constraints', instructions: 'Add specific constraints and limitations' },
-    { label: 'Make it more professional', instructions: 'Make this prompt more professional and formal' },
-    { label: 'Add examples', instructions: 'Add specific examples and use cases' }
+  const getScoreColor = (score: number) => {
+    if (score >= 8) return 'text-green-600 bg-green-50 border-green-200';
+    if (score >= 6) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    return 'text-red-600 bg-red-50 border-red-200';
+  };
+
+  // Beautiful advanced refinement options
+  const advancedRefinements: AdvancedRefinementOption[] = [
+    {
+      id: 'make_concise',
+      title: 'Make Concise',
+      description: 'Simplify and shorten while keeping essentials',
+      icon: Target,
+      instruction: 'Make this prompt more concise and to the point while maintaining all essential information',
+      category: 'clarity',
+      color: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+    },
+    {
+      id: 'add_details',
+      title: 'Add Details',
+      description: 'Expand with specific information and examples',
+      icon: Layers,
+      instruction: 'Add more specific details, examples, and comprehensive information to make this prompt more thorough',
+      category: 'completeness',
+      color: 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+    },
+    {
+      id: 'professional_tone',
+      title: 'Professional Tone',
+      description: 'Make it formal and business-appropriate',
+      icon: Code,
+      instruction: 'Transform this prompt to have a more professional, formal, and business-appropriate tone',
+      category: 'tone',
+      color: 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
+    },
+    {
+      id: 'creative_style',
+      title: 'Creative Style',
+      description: 'Make it imaginative and engaging',
+      icon: Sparkles,
+      instruction: 'Make this prompt more creative, engaging, and imaginative while maintaining its core purpose',
+      category: 'style',
+      color: 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
+    },
+    {
+      id: 'target_audience',
+      title: 'Target Audience',
+      description: 'Specify who this is for',
+      icon: Users,
+      instruction: 'Add specific details about your target audience (e.g., "for marketing professionals", "for beginners")',
+      category: 'audience',
+      color: 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100'
+    },
+    {
+      id: 'output_format',
+      title: 'Output Format',
+      description: 'Define response structure',
+      icon: FileText,
+      instruction: 'Specify the desired output format (e.g., "provide as bullet points", "write in code format")',
+      category: 'format',
+      color: 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+    }
   ];
 
-  if (result) {
-    return <ResultViewer result={result} onBack={() => setResult(null)} />;
-  }
+  const handleAdvancedRefinement = (refinement: AdvancedRefinementOption) => {
+    handleRefine(refinement.instruction, refinement.id);
+  };
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10">
+        <div className="p-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Wand2 size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold">One-Click Optimizer</h1>
-              <p className="text-blue-100 text-xs">Instant AI-powered optimization</p>
+              <h1 className="text-lg font-bold text-gray-900">Prompt Optimizer</h1>
+              <p className="text-sm text-gray-500">AI-powered prompt enhancement</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className={`px-2 py-1 rounded text-xs font-medium ${
-              isConnected ? 'bg-green-500/20 text-green-100' : 'bg-red-500/20 text-red-100'
+          
+          <div className="flex items-center space-x-3">
+            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+              isConnected 
+                ? 'bg-green-100 text-green-700 border border-green-200' 
+                : 'bg-red-100 text-red-700 border border-red-200'
             }`}>
-              {isConnected ? 'Connected' : 'Disconnected'}
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
             </div>
+            
             <button
               onClick={testConnection}
-              className="w-6 h-6 bg-white/20 rounded flex items-center justify-center hover:bg-white/30 transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-all"
               title="Retry connection"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-              </svg>
+              <RefreshCw size={16} className={isOptimizing ? 'animate-spin' : ''} />
             </button>
           </div>
         </div>
@@ -258,13 +314,12 @@ const OneClickOptimizer: React.FC<OneClickOptimizerProps> = ({ initialText = '' 
 
       {/* Connection Error Banner */}
       {!isConnected && (
-        <div className="bg-red-50 border-b border-red-200 p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <span className="text-red-700 text-sm font-medium">API Server Not Connected</span>
+        <div className="mx-4 mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex items-center space-x-3">
+            <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-red-700 font-medium">Connection Issue</p>
+              <p className="text-red-600 text-sm">{error || 'API server is not responding'}</p>
             </div>
             <button
               onClick={testConnection}
@@ -277,144 +332,262 @@ const OneClickOptimizer: React.FC<OneClickOptimizerProps> = ({ initialText = '' 
       )}
 
       {/* Main Content */}
-      <div className="p-4 space-y-4">
-        {/* Current Prompt */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-sm font-semibold text-gray-900">Current Prompt</label>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => copyToClipboard(currentPrompt)}
-                className="px-3 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
-              >
-                Copy
-              </button>
-              <button
-                onClick={resetOptimization}
-                className="px-3 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-              >
-                Reset
-              </button>
+      <div className="p-4 space-y-6">
+        {/* Input Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <FileText size={20} className="text-blue-600" />
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {optimizationHistory.length > 0 ? "Optimized Prompt" : "Your Prompt"}
+                </h2>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                {optimizationHistory.length > 0 && (
+                  <button
+                    onClick={() => copyToClipboard(optimizationHistory[0].prompt)}
+                    className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
+                  >
+                    {copied ? <CheckCircle size={14} className="text-green-600" /> : <Copy size={14} />}
+                    <span>{copied ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                )}
+                
+                {optimizationHistory.length > 0 && (
+                  <button
+                    onClick={() => setCurrentPrompt(optimizationHistory[0].prompt)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-all"
+                  >
+                    Use as Input
+                  </button>
+                )}
+                
+                <button
+                  onClick={resetOptimization}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
+                >
+                  Reset
+                </button>
+              </div>
             </div>
+            
+            <textarea
+              value={currentPrompt}
+              onChange={(e) => setCurrentPrompt(e.target.value)}
+              placeholder="Enter your prompt here... (e.g., 'I want to write an email to a client')"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+              rows={4}
+            />
+            
+            {optimizationHistory.length > 0 && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-blue-700">Latest Optimization</span>
+                  </div>
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium border ${getScoreColor(optimizationHistory[0].score)}`}>
+                    Score: {optimizationHistory[0].score.toFixed(1)}/10
+                  </div>
+                </div>
+                <p className="text-sm text-blue-600">
+                  {optimizationHistory[0].refinementType ? 
+                    `Refined with: ${optimizationHistory[0].refinementType.replace('_', ' ')}` : 
+                    'Initial optimization completed'
+                  }
+                </p>
+              </div>
+            )}
           </div>
-          <textarea
-            value={currentPrompt}
-            onChange={(e) => setCurrentPrompt(e.target.value)}
-            placeholder="Enter your prompt here..."
-            className="w-full bg-white border border-gray-200 rounded p-3 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            rows={4}
-          />
         </div>
 
-        {/* One-Click Optimize Button */}
+        {/* Optimize Button */}
         <button
           onClick={handleOptimize}
           disabled={isOptimizing || !currentPrompt.trim() || !isConnected}
-          className="w-full py-3 px-4 rounded-lg text-base font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2"
+          className="w-full py-4 px-6 rounded-2xl text-base font-semibold bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center space-x-3"
         >
           {isOptimizing ? (
-            <>
-              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-              </svg>
-              <span>Optimizing...</span>
-            </>
+            <Loader2 size={20} className="animate-spin" />
           ) : (
-            <>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
-              <span>Optimize Now</span>
-            </>
+            <Zap size={20} />
           )}
+          <span>{isOptimizing ? 'Optimizing...' : 'Optimize Prompt'}</span>
         </button>
 
-        {/* Quick Refinement Options */}
+        {/* Results Section */}
         {optimizationHistory.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <label className="text-sm font-semibold text-gray-900 mb-3 block">Quick Refinements</label>
-            <div className="grid grid-cols-2 gap-2">
-              {quickRefinements.map((refinement, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleRefine(refinement.instructions)}
-                  disabled={isOptimizing || !isConnected}
-                  className="p-3 rounded border text-xs transition-all bg-white border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="font-medium mb-1">{refinement.label}</div>
-                  <div className="text-gray-500 text-xs">{refinement.instructions.substring(0, 50)}...</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Optimized Result</h3>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => copyToClipboard(optimizationHistory[0].prompt)}
+                    className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
+                  >
+                    {copied ? <CheckCircle size={14} className="text-green-600" /> : <Copy size={14} />}
+                    <span>{copied ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                  {optimizationHistory[0].prompt}
+                </p>
+              </div>
 
-        {/* Custom Refinement */}
-        {optimizationHistory.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <label className="text-sm font-semibold text-gray-900 mb-3 block">Custom Refinement</label>
-            <textarea
-              value={refinementInstructions}
-              onChange={(e) => setRefinementInstructions(e.target.value)}
-              placeholder="Enter your custom refinement instructions..."
-              className="w-full h-16 px-3 py-2 border border-gray-200 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button
-              onClick={() => {
-                handleRefine(refinementInstructions);
-                setRefinementInstructions('');
-              }}
-              disabled={isOptimizing || !refinementInstructions.trim() || !isConnected}
-              className="mt-2 bg-blue-600 py-2 px-4 rounded text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Apply Refinement
-            </button>
+              {/* Advanced Refinements Section */}
+              <div className="border-t border-gray-200 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Settings size={18} className="text-gray-600" />
+                    <h4 className="text-base font-semibold text-gray-800">Advanced Refinements</h4>
+                  </div>
+                  <button
+                    onClick={() => setShowAdvancedRefinements(!showAdvancedRefinements)}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    {showAdvancedRefinements ? 'Hide' : 'Show'} Advanced
+                  </button>
+                </div>
+                
+                {showAdvancedRefinements && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      {advancedRefinements.map((refinement) => {
+                        const Icon = refinement.icon;
+                        return (
+                          <button
+                            key={refinement.id}
+                            onClick={() => handleAdvancedRefinement(refinement)}
+                            disabled={isOptimizing}
+                            className={`p-4 rounded-xl border text-left transition-all hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed group ${refinement.color}`}
+                          >
+                            <div className="flex items-start space-x-3">
+                              <div className="flex-shrink-0 mt-0.5">
+                                <Icon size={16} className="text-current" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h5 className="font-semibold text-sm">{refinement.title}</h5>
+                                  <ArrowRight size={14} className="text-current opacity-60 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                                <p className="text-xs opacity-80 leading-relaxed">{refinement.description}</p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Custom Refinement */}
+                    <div className="border-t border-gray-200 pt-4">
+                      <h5 className="text-sm font-semibold text-gray-700 mb-3">Custom Refinement</h5>
+                      <div className="space-y-3">
+                        <textarea
+                          value={customRefinement}
+                          onChange={(e) => setCustomRefinement(e.target.value)}
+                          placeholder="Enter your custom refinement instructions..."
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                          rows={3}
+                        />
+                        <button
+                          onClick={() => {
+                            if (customRefinement.trim()) {
+                              handleRefine(customRefinement, 'custom');
+                              setCustomRefinement('');
+                            }
+                          }}
+                          disabled={isOptimizing || !customRefinement.trim() || !isConnected}
+                          className="w-full bg-blue-600 py-2 px-4 rounded-lg text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
+                        >
+                          <Sparkles size={14} />
+                          <span>Apply Custom Refinement</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Dynamic Refinement Component */}
+              <div className="border-t border-gray-200 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles size={18} className="text-purple-600" />
+                    <h4 className="text-base font-semibold text-gray-800">Smart Refinements</h4>
+                  </div>
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium border ${getScoreColor(optimizationHistory[0].score)}`}>
+                    Score: {optimizationHistory[0].score.toFixed(1)}/10
+                  </div>
+                </div>
+                
+                <DynamicRefinement
+                  originalPrompt={initialText}
+                  optimizedPrompt={optimizationHistory[0].prompt}
+                  optimizationAnalysis={optimizationHistory[0].analysis}
+                  currentIteration={currentIteration}
+                  onRefine={handleRefine}
+                  isOptimizing={isOptimizing}
+                />
+              </div>
+
+              {/* Optimization History */}
+              {optimizationHistory.length > 1 && (
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-2">
+                      <History size={18} className="text-gray-600" />
+                      <h4 className="text-base font-semibold text-gray-800">Optimization History</h4>
+                    </div>
+                    <button
+                      onClick={() => setShowHistory(!showHistory)}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      {showHistory ? 'Hide' : 'Show'} History
+                    </button>
+                  </div>
+                  
+                  {showHistory && (
+                    <div className="space-y-3 max-h-48 overflow-y-auto">
+                      {optimizationHistory.slice(1).map((item, index) => (
+                        <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-700">Iteration {item.iteration}</span>
+                            <div className={`px-2 py-1 rounded-full text-xs font-medium border ${getScoreColor(item.score)}`}>
+                              {item.score.toFixed(1)}
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-600 truncate">
+                            {item.prompt.length > 100 ? item.prompt.substring(0, 100) + '...' : item.prompt}
+                          </p>
+                          {item.refinementType && (
+                            <span className="text-xs text-blue-600 mt-1 block">{item.refinementType}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* Error Display */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded p-3">
-            <div className="flex items-start space-x-2">
-              <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="flex items-start space-x-3">
+              <AlertCircle size={20} className="text-red-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-red-700 text-sm font-medium">Error</p>
+                <p className="text-red-700 font-medium">Error</p>
                 <p className="text-red-600 text-sm mt-1">{error}</p>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Optimization History */}
-        {optimizationHistory.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-semibold text-gray-900">Optimization History</label>
-              <button
-                onClick={() => setShowHistory(!showHistory)}
-                className="text-xs font-medium text-blue-600 hover:text-blue-700"
-              >
-                {showHistory ? 'Hide' : 'Show'} History
-              </button>
-            </div>
-            {showHistory && (
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {optimizationHistory.map((item, index) => (
-                  <div key={index} className="rounded p-3 bg-gray-50 border border-gray-200">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium">Iteration {item.iteration}</span>
-                      <span className="text-xs text-gray-500">Score: {item.score.toFixed(1)}</span>
-                    </div>
-                    <p className="text-xs text-gray-700 truncate">
-                      {item.prompt.length > 100 ? item.prompt.substring(0, 100) + '...' : item.prompt}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>

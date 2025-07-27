@@ -4,9 +4,10 @@
   "description": "Chrome extension for UsersPrompts AI prompt optimizer",
   "main": "popup.js",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && chmod +x copy-to-dist.sh && ./copy-to-dist.sh",
     "dev": "vite",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "copy-files": "./copy-to-dist.sh"
   },
   "dependencies": {
     "axios": "^1.6.0",

@@ -1,5 +1,7 @@
 // Background service worker for UsersPrompts Chrome Extension
 
+let lastSelectedText: string = '';
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log('UsersPrompts AI Extension installed');
 });
@@ -18,12 +20,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'OPEN_POPUP_WITH_TEXT') {
     // Store the text for the popup to access
     const text = request.text || request.data?.text || '';
+    lastSelectedText = text;
     console.log('Storing text and opening popup:', text.substring(0, 50) + '...');
     chrome.storage.local.set({ selectedText: text }, () => {
       chrome.action.openPopup();
       sendResponse({ success: true });
     });
     return true; // Keep message channel open for async response
+  }
+  
+  if (request.type === 'GET_LAST_TEXT') {
+    sendResponse({ text: lastSelectedText });
+    return true;
   }
   
   if (request.type === 'OPTIMIZE_PROMPT') {

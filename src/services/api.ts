@@ -151,6 +151,81 @@ class ApiService {
       return false;
     }
   }
+
+  // Refinement API methods
+  async analyzePrompt(prompt: string): Promise<any> {
+    try {
+      console.log('Analyzing prompt for refinement options...');
+      const response = await this.api.post('/refinement/options', { prompt });
+      console.log('Prompt analysis completed');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error analyzing prompt:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  async applyRefinement(request: {
+    original_prompt: string;
+    refinement_type: string;
+    slider_values?: Record<string, number>;
+    custom_instructions?: string;
+  }): Promise<any> {
+    try {
+      console.log('Applying refinement...');
+      const response = await this.api.post('/refinement/apply', request);
+      console.log('Refinement applied successfully');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error applying refinement:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  async getRefinementTypes(): Promise<any> {
+    try {
+      console.log('Getting refinement types...');
+      const response = await this.api.get('/refinement/types');
+      console.log('Refinement types retrieved');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error getting refinement types:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  async getDynamicRefinementSuggestions(
+    originalPrompt: string,
+    optimizedPrompt: string,
+    optimizationAnalysis?: any,
+    currentIteration: number = 1
+  ): Promise<any> {
+    try {
+      const response = await this.api.post('/api/v1/prompt-optimizer/dynamic-refinement-suggestions', {
+        original_prompt: originalPrompt,
+        optimized_prompt: optimizedPrompt,
+        optimization_analysis: optimizationAnalysis,
+        current_iteration: currentIteration
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting dynamic refinement suggestions:', error);
+      throw error;
+    }
+  }
+
+  private handleError(error: any): Error {
+    if (error.response) {
+      const errorMessage = error.response.data?.detail || 
+                         error.response.data?.error || 
+                         `Server error: ${error.response.status}`;
+      return new Error(`API Error (${error.response.status}): ${errorMessage}`);
+    } else if (error.request) {
+      return new Error('No response from server. Please check if the API server is running.');
+    } else {
+      return new Error(`Request failed: ${error.message}`);
+    }
+  }
 }
 
 export const apiService = new ApiService(); 
