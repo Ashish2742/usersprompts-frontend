@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { PromptOptimizationResult } from '../types/api';
 import { 
-  Clipboard, 
   Check, 
   ArrowLeft, 
   Lightbulb, 
@@ -12,7 +11,6 @@ import {
   Target, 
   Settings, 
   Wand2, 
-  Palette, 
   Code, 
   Layers,
   TrendingUp,
@@ -26,7 +24,10 @@ import {
   ArrowRight,
   RefreshCw,
   Copy,
-  Download
+  Award,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface ResultViewerProps {
@@ -50,6 +51,8 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
   const [copied, setCopied] = useState(false);
   const [refinementInstructions, setRefinementInstructions] = useState('');
   const [isRefining, setIsRefining] = useState(false);
+  const [showDetailedScores, setShowDetailedScores] = useState(false);
+  const [showAllIssues, setShowAllIssues] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(getOptimizedPrompt());
@@ -60,16 +63,53 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
   const getOptimizedPrompt = () => result.optimized_prompt || 'No optimized prompt available';
   const getOriginalPrompt = () => result.original_prompt || 'No original prompt available';
   const getScores = () => result.scores?.optimized || {};
+  const getOriginalScores = () => result.scores?.original || {};
   const getKeyImprovements = () => result.optimization_analysis?.key_improvements || [];
   const getRecommendations = () => result.recommendations || [];
   const getDetailedFeedback = () => result.detailed_feedback || {};
 
   const tabs = [
     { id: 'optimized', label: 'Result', icon: Star, color: 'from-green-500 to-blue-500' },
-    { id: 'analysis', label: 'Analysis', icon: BarChart2, color: 'from-blue-500 to-purple-500' },
+    { id: 'analysis', label: 'Deep Analysis', icon: BarChart2, color: 'from-blue-500 to-purple-500' },
     { id: 'feedback', label: 'Insights', icon: Lightbulb, color: 'from-yellow-500 to-orange-500' },
-    { id: 'refine', label: 'Refine', icon: Sparkles, color: 'from-purple-500 to-pink-500' }
+    { id: 'refine', label: 'Refine More', icon: Sparkles, color: 'from-purple-500 to-pink-500' }
   ];
+
+  const getScoreColor = (score: number) => {
+    if (score >= 8.5) return 'from-emerald-500 to-green-500';
+    if (score >= 7.5) return 'from-green-500 to-blue-500';
+    if (score >= 6.5) return 'from-yellow-500 to-orange-500';
+    if (score >= 5) return 'from-orange-500 to-red-500';
+    return 'from-red-500 to-pink-500';
+  };
+
+  const getScoreTextColor = (score: number) => {
+    if (score >= 8.5) return 'text-emerald-700';
+    if (score >= 7.5) return 'text-green-700';
+    if (score >= 6.5) return 'text-yellow-700';
+    if (score >= 5) return 'text-orange-700';
+    return 'text-red-700';
+  };
+
+  const getScoreIcon = (score: number) => {
+    if (score >= 8.5) return Award;
+    if (score >= 7.5) return CheckCircle2;
+    if (score >= 6.5) return AlertCircle;
+    return AlertTriangle;
+  };
+
+  const getImprovementIndicator = (originalScore: number, newScore: number) => {
+    const improvement = newScore - originalScore;
+    if (improvement > 0) {
+      return (
+        <div className="flex items-center space-x-1 text-green-600">
+          <TrendingUp size={12} />
+          <span className="text-xs font-medium">+{improvement.toFixed(1)}</span>
+        </div>
+      );
+    }
+    return null;
+  };
 
   const refinementOptions: RefinementOption[] = [
     {
@@ -171,6 +211,20 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
   };
 
   const OptimizedPromptView = () => {
+    const scores = getScores();
+    const originalScores = getOriginalScores();
+    const feedback = getDetailedFeedback();
+    const overallScore = scores.overall || 8.5;
+    const originalOverallScore = originalScores.overall || 6.0;
+    
+    const topScoreEntries = Object.entries(scores)
+      .filter(([key, value]) => key !== 'overall' && typeof value === 'object' && 'score' in value)
+      .sort(([,a], [,b]) => (b as any).score - (a as any).score)
+      .slice(0, 3);
+
+    const primaryIssues = feedback.what_was_wrong?.primary_issues || [];
+    const majorImprovements = feedback.what_was_improved?.major_improvements || [];
+
     const handleReplaceInChatGPT = () => {
       const optimizedText = getOptimizedPrompt();
       
@@ -192,83 +246,233 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
 
     return (
       <div className="space-y-6">
-        {/* Score Overview */}
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl flex items-center justify-center">
-                <TrendingUp size={24} className="text-white" />
+        {/* Hero Score Section */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 rounded-3xl p-8 border border-green-200/50 shadow-xl">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400/20 to-blue-400/20 rounded-full -mr-16 -mt-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-purple-400/20 to-pink-400/20 rounded-full -ml-12 -mb-12"></div>
+          
+          <div className="relative">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
+                  <TrendingUp size={32} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+                    Optimization Complete
+                  </h2>
+                  <p className="text-gray-600 text-lg">Your prompt has been enhanced significantly</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Optimization Complete</h3>
-                <p className="text-sm text-gray-600">Your prompt has been enhanced</p>
+              
+              <div className="text-center">
+                <div className="relative">
+                  <div className="text-5xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-2">
+                    {overallScore.toFixed(1)}
+                  </div>
+                  <div className="text-sm text-gray-500 font-medium">out of 10</div>
+                  {getImprovementIndicator(originalOverallScore, overallScore)}
+                </div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-                {result.scores?.optimized?.overall?.toFixed(1) || '8.5'}/10
-              </div>
-              <p className="text-sm text-gray-500">Overall Score</p>
+
+            {/* Quick Score Overview */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              {topScoreEntries.map(([key, value]) => {
+                const score = (value as any).score;
+                const originalScoreValue = originalScores[key as keyof typeof originalScores];
+                const originalScore = typeof originalScoreValue === 'object' ? originalScoreValue?.score : originalScoreValue || 5;
+                const ScoreIcon = getScoreIcon(score);
+                
+                return (
+                  <div key={key} className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <ScoreIcon size={18} className={getScoreTextColor(score)} />
+                      <span className="text-2xl font-bold text-gray-900">{score.toFixed(1)}</span>
+                    </div>
+                    <div className="text-sm font-medium text-gray-700 capitalize mb-1">
+                      {key.replace(/_/g, ' ')}
+                    </div>
+                    {getImprovementIndicator(originalScore, score)}
+                  </div>
+                );
+              })}
             </div>
+
+            {/* Show More Scores Toggle */}
+            <button
+              onClick={() => setShowDetailedScores(!showDetailedScores)}
+              className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors"
+            >
+              <span>{showDetailedScores ? 'Hide' : 'Show'} detailed scores</span>
+              {showDetailedScores ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {/* Detailed Scores */}
+            {showDetailedScores && (
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {Object.entries(scores)
+                  .filter(([key, value]) => key !== 'overall' && typeof value === 'object' && 'score' in value)
+                  .map(([key, value]) => {
+                    const score = (value as any).score;
+                    const originalScoreValue = originalScores[key as keyof typeof originalScores];
+                    const originalScore = typeof originalScoreValue === 'object' ? originalScoreValue?.score : originalScoreValue || 5;
+                    
+                    return (
+                      <div key={key} className="bg-white/50 backdrop-blur-sm rounded-lg p-3 border border-white/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-700 capitalize">
+                            {key.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-lg font-bold text-gray-900">{score.toFixed(1)}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                          <div 
+                            className={`bg-gradient-to-r ${getScoreColor(score)} h-2 rounded-full transition-all duration-500`}
+                            style={{ width: `${score * 10}%` }}
+                          ></div>
+                        </div>
+                        {getImprovementIndicator(originalScore, score)}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Original vs Optimized */}
-        <div className="grid grid-cols-1 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="bg-gray-100 px-4 py-3 border-b border-gray-200">
-              <h4 className="text-sm font-semibold text-gray-700 flex items-center space-x-2">
-                <Eye size={16} />
-                <span>Original Prompt</span>
-              </h4>
-            </div>
-            <div className="p-4">
-              <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
-                {getOriginalPrompt()}
-              </p>
-            </div>
-          </div>
+        {/* Issues Fixed & Improvements Made */}
+        {(primaryIssues.length > 0 || majorImprovements.length > 0) && (
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Issues Fixed */}
+            {primaryIssues.length > 0 && (
+              <div className="bg-white rounded-2xl border border-red-200/50 overflow-hidden shadow-lg">
+                <div className="bg-gradient-to-r from-red-500 to-pink-500 px-6 py-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+                    <Shield size={20} />
+                    <span>Issues Fixed</span>
+                  </h3>
+                </div>
+                
+                <div className="p-6">
+                  <div className="space-y-3">
+                    {primaryIssues.slice(0, showAllIssues ? undefined : 3).map((item, index) => (
+                      <div key={index} className="flex items-start space-x-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                        <CheckCircle2 className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
+                        <span className="text-sm text-gray-700 leading-relaxed">{item}</span>
+                      </div>
+                    ))}
+                    
+                    {primaryIssues.length > 3 && (
+                      <button
+                        onClick={() => setShowAllIssues(!showAllIssues)}
+                        className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center space-x-1"
+                      >
+                        <span>{showAllIssues ? 'Show less' : `Show ${primaryIssues.length - 3} more issues`}</span>
+                        {showAllIssues ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
-          <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border border-blue-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3">
-              <div className="flex items-center justify-between">
+            {/* Improvements Made */}
+            {majorImprovements.length > 0 && (
+              <div className="bg-white rounded-2xl border border-green-200/50 overflow-hidden shadow-lg">
+                <div className="bg-gradient-to-r from-green-500 to-blue-500 px-6 py-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+                    <Sparkles size={20} />
+                    <span>Improvements Made</span>
+                  </h3>
+                </div>
+                
+                <div className="p-6">
+                  <div className="space-y-3">
+                    {majorImprovements.map((item, index) => (
+                      <div key={index} className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <CheckCircle2 className="text-green-500 flex-shrink-0 mt-0.5" size={16} />
+                        <span className="text-sm text-gray-700 leading-relaxed">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Original vs Optimized Comparison */}
+        <div className="space-y-4">
+          <h3 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
+            <Eye size={24} />
+            <span>Before & After Comparison</span>
+          </h3>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-lg">
+              <div className="bg-gradient-to-r from-gray-500 to-gray-600 px-4 py-3 border-b border-gray-200">
                 <h4 className="text-sm font-semibold text-white flex items-center space-x-2">
-                  <Sparkles size={16} />
-                  <span>Optimized Prompt</span>
+                  <Eye size={16} />
+                  <span>Original Prompt</span>
+                  <div className="ml-auto bg-white/20 px-2 py-1 rounded text-xs">
+                    Score: {originalOverallScore.toFixed(1)}/10
+                  </div>
                 </h4>
-                <button
-                  onClick={handleCopy}
-                  className="flex items-center space-x-1 px-3 py-1 bg-white/20 rounded-lg text-white hover:bg-white/30 transition-all"
-                >
-                  {copied ? <Check size={14} /> : <Copy size={14} />}
-                  <span className="text-xs">{copied ? 'Copied!' : 'Copy'}</span>
-                </button>
+              </div>
+              <div className="p-4 max-h-48 overflow-y-auto">
+                <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
+                  {getOriginalPrompt()}
+                </p>
               </div>
             </div>
-            <div className="p-4">
-              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                {getOptimizedPrompt()}
-              </p>
+
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border border-blue-200 overflow-hidden shadow-lg">
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-white flex items-center space-x-2">
+                    <Sparkles size={16} />
+                    <span>Optimized Prompt</span>
+                  </h4>
+                  <div className="flex items-center space-x-2">
+                    <div className="bg-white/20 px-2 py-1 rounded text-xs text-white">
+                      Score: {overallScore.toFixed(1)}/10
+                    </div>
+                    <button
+                      onClick={handleCopy}
+                      className="flex items-center space-x-1 px-3 py-1 bg-white/20 rounded-lg text-white hover:bg-white/30 transition-all"
+                    >
+                      {copied ? <Check size={14} /> : <Copy size={14} />}
+                      <span className="text-xs">{copied ? 'Copied!' : 'Copy'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 max-h-48 overflow-y-auto">
+                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {getOptimizedPrompt()}
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4">
           <button
             onClick={handleReplaceInChatGPT}
-            className="flex-1 flex items-center justify-center space-x-2 py-3 px-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-blue-700 transition-all shadow-lg"
+            className="flex-1 flex items-center justify-center space-x-3 py-4 px-6 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-2xl font-bold text-lg hover:from-green-700 hover:to-blue-700 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105"
           >
-            <Zap size={18} />
+            <Zap size={24} />
             <span>Use in ChatGPT</span>
-            <ArrowRight size={16} />
+            <ArrowRight size={20} />
           </button>
           
           <button
             onClick={() => setActiveTab('refine')}
-            className="flex-1 flex items-center justify-center space-x-2 py-3 px-4 bg-white border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all"
+            className="flex-1 flex items-center justify-center space-x-3 py-4 px-6 bg-white border-2 border-purple-300 text-purple-700 rounded-2xl font-bold text-lg hover:bg-purple-50 transition-all shadow-lg hover:shadow-xl"
           >
-            <RefreshCw size={18} />
+            <RefreshCw size={20} />
             <span>Refine Further</span>
           </button>
         </div>
@@ -282,25 +486,13 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
       key !== 'overall' && typeof value === 'object' && 'score' in value
     );
 
-    const getScoreColor = (score: number) => {
-      if (score >= 8) return 'from-green-500 to-emerald-500';
-      if (score >= 6) return 'from-yellow-500 to-orange-500';
-      return 'from-red-500 to-pink-500';
-    };
-
-    const getScoreIcon = (score: number) => {
-      if (score >= 8) return CheckCircle2;
-      if (score >= 6) return AlertCircle;
-      return AlertCircle;
-    };
-
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3">
             <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
               <Gauge size={20} />
-              <span>Performance Metrics</span>
+              <span>Detailed Performance Metrics</span>
             </h3>
           </div>
           
@@ -314,7 +506,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
                 <div key={key} className="bg-gray-50 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
-                      <ScoreIcon size={18} className={`${score >= 8 ? 'text-green-500' : score >= 6 ? 'text-yellow-500' : 'text-red-500'}`} />
+                      <ScoreIcon size={18} className={getScoreTextColor(score)} />
                       <span className="font-semibold capitalize text-gray-700">
                         {key.replace(/_/g, ' ')}
                       </span>
@@ -511,55 +703,55 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 relative flex-shrink-0">
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden">
+      {/* Enhanced Header */}
+      <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200/50 relative flex-shrink-0 shadow-sm">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-5"></div>
         <div className="relative p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Star size={24} className="text-white" />
+            <div className="flex items-center space-x-4">
+              <div className="w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Star size={28} className="text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   Optimization Results
                 </h1>
-                <p className="text-sm text-gray-600">
+                <p className="text-gray-600">
                   {isRefining ? 'Refining your prompt...' : 'Your enhanced prompt is ready'}
                 </p>
               </div>
               {isRefining && (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3 bg-blue-50 px-4 py-2 rounded-full border border-blue-200">
                   <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-xs text-blue-600 font-medium">Processing...</span>
+                  <span className="text-sm text-blue-600 font-medium">Processing...</span>
                 </div>
               )}
             </div>
             <button
               onClick={onBack}
-              className="p-2 rounded-lg hover:bg-white/50 text-gray-600 hover:text-gray-800 transition-all"
+              className="p-3 rounded-xl hover:bg-white/50 text-gray-600 hover:text-gray-800 transition-all shadow-sm hover:shadow-md"
               disabled={isRefining}
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={24} />
             </button>
           </div>
 
           {/* Enhanced Tabs */}
-          <div className="mt-4">
-            <div className="flex space-x-1 bg-gray-100 rounded-xl p-1">
+          <div className="mt-6">
+            <div className="flex space-x-1 bg-gray-100/80 rounded-2xl p-1.5">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
                   disabled={isRefining}
-                  className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  className={`flex-1 flex items-center justify-center space-x-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all ${
                     activeTab === tab.id
-                      ? `bg-gradient-to-r ${tab.color} text-white shadow-lg`
-                      : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
+                      ? `bg-gradient-to-r ${tab.color} text-white shadow-lg transform scale-105`
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-white/70'
                   } ${isRefining ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <tab.icon size={16} />
+                  <tab.icon size={18} />
                   <span>{tab.label}</span>
                 </button>
               ))}
@@ -568,9 +760,11 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {renderContent()}
+      {/* Main Content with Improved Scrolling */}
+      <div className="flex-1 overflow-y-auto p-6" style={{ scrollBehavior: 'smooth' }}>
+        <div className="max-w-4xl mx-auto">
+          {renderContent()}
+        </div>
       </div>
     </div>
   );
