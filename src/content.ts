@@ -1,4 +1,5 @@
 // Content script for Chrome extension
+
 let buttonDiv: HTMLElement | null = null;
 let tooltipDiv: HTMLElement | null = null;
 let isVisible = false;
@@ -20,19 +21,19 @@ function isExtensionContextValid(): boolean {
   
   try {
     // Check if Chrome APIs are available
-    if (typeof chrome === 'undefined') {
+    if (typeof window.chrome === 'undefined') {
       console.warn('Chrome API not available');
       return false;
     }
     
     // Check if runtime API is available
-    if (!chrome.runtime) {
+    if (!window.chrome.runtime) {
       console.warn('Chrome runtime API not available');
       return false;
     }
     
     // Check if storage API is available
-    if (!chrome.storage) {
+    if (!window.chrome.storage) {
       console.warn('Chrome storage API not available');
       return false;
     }
@@ -75,9 +76,9 @@ function cleanupOnContextInvalidation(): void {
 }
 
 // Listen for extension context invalidation
-if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onSuspend) {
+if (typeof window.chrome !== 'undefined' && window.chrome.runtime && window.chrome.runtime.onSuspend) {
   try {
-    chrome.runtime.onSuspend.addListener(() => {
+    window.chrome.runtime.onSuspend.addListener(() => {
       console.log('Extension suspended, cleaning up...');
       cleanupOnContextInvalidation();
     });
@@ -95,10 +96,10 @@ async function safeChromeStorageSet(key: string, value: any): Promise<void> {
   
   try {
     return new Promise((resolve, reject) => {
-      chrome.storage.local.set({ [key]: value }, () => {
-        if (chrome.runtime.lastError) {
-          console.error('Storage error:', chrome.runtime.lastError);
-          reject(chrome.runtime.lastError);
+      window.chrome.storage.local.set({ [key]: value }, () => {
+        if (window.chrome.runtime.lastError) {
+          console.error('Storage error:', window.chrome.runtime.lastError);
+          reject(window.chrome.runtime.lastError);
         } else {
           resolve();
         }
@@ -120,10 +121,10 @@ async function safeChromeRuntimeSendMessage(message: any): Promise<any> {
   
   try {
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(message, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error('Runtime message error:', chrome.runtime.lastError);
-          reject(chrome.runtime.lastError);
+      window.chrome.runtime.sendMessage(message, (response: any) => {
+        if (window.chrome.runtime.lastError) {
+          console.error('Runtime message error:', window.chrome.runtime.lastError);
+          reject(window.chrome.runtime.lastError);
         } else {
           resolve(response);
         }
@@ -813,54 +814,56 @@ function init(): void {
 }
 
 // Handle messages from popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('Content script received message:', message);
-  
-  if (message.type === 'GET_SELECTED_TEXT') {
-    let selectedText = '';
+if (typeof window.chrome !== 'undefined' && window.chrome.runtime) {
+  window.chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: any) => {
+    console.log('Content script received message:', message);
     
-    // Try to get text from ChatGPT input first
-    if (isChatGPT && chatInputField) {
-      selectedText = chatInputField.value;
-      console.log('Got text from ChatGPT input:', selectedText.substring(0, 50) + '...');
+    if (message.type === 'GET_SELECTED_TEXT') {
+      let selectedText = '';
+      
+      // Try to get text from ChatGPT input first
+      if (isChatGPT && chatInputField) {
+        selectedText = chatInputField.value;
+        console.log('Got text from ChatGPT input:', selectedText.substring(0, 50) + '...');
+      }
+      
+      // If no text in input, get selected text
+      if (!selectedText) {
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim()) {
+          selectedText = selection.toString().trim();
+          console.log('Got text from selection:', selectedText.substring(0, 50) + '...');
+        }
+      }
+      
+      console.log('Sending selected text:', selectedText.substring(0, 50) + '...');
+      sendResponse({ text: selectedText });
     }
     
-    // If no text in input, get selected text
-    if (!selectedText) {
-      const selection = window.getSelection();
-      if (selection && selection.toString().trim()) {
-        selectedText = selection.toString().trim();
-        console.log('Got text from selection:', selectedText.substring(0, 50) + '...');
+    if (message.type === 'GET_CHATGPT_TEXT') {
+      let chatGPTText = '';
+      
+      if (isChatGPT && chatInputField) {
+        chatGPTText = chatInputField.value;
+        console.log('Sending ChatGPT text:', chatGPTText.substring(0, 50) + '...');
+      }
+      
+      sendResponse({ text: chatGPTText });
+    }
+    
+    if (message.type === 'REPLACE_CHATGPT_TEXT') {
+      const newText = message.text || '';
+      console.log('Replacing ChatGPT text with:', newText.substring(0, 50) + '...');
+      
+      if (isChatGPT && chatInputField) {
+        replaceInputText(newText);
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'ChatGPT input not found' });
       }
     }
-    
-    console.log('Sending selected text:', selectedText.substring(0, 50) + '...');
-    sendResponse({ text: selectedText });
-  }
-  
-  if (message.type === 'GET_CHATGPT_TEXT') {
-    let chatGPTText = '';
-    
-    if (isChatGPT && chatInputField) {
-      chatGPTText = chatInputField.value;
-      console.log('Sending ChatGPT text:', chatGPTText.substring(0, 50) + '...');
-    }
-    
-    sendResponse({ text: chatGPTText });
-  }
-  
-  if (message.type === 'REPLACE_CHATGPT_TEXT') {
-    const newText = message.text || '';
-    console.log('Replacing ChatGPT text with:', newText.substring(0, 50) + '...');
-    
-    if (isChatGPT && chatInputField) {
-      replaceInputText(newText);
-      sendResponse({ success: true });
-    } else {
-      sendResponse({ success: false, error: 'ChatGPT input not found' });
-    }
-  }
-});
+  });
+}
 
 // Initialize on page load
 if (document.readyState === 'loading') {

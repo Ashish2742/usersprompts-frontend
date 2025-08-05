@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { PromptOptimizationResult } from '../types/api';
 import { 
+  Clipboard, 
   Check, 
   ArrowLeft, 
   Lightbulb, 
@@ -11,6 +12,7 @@ import {
   Target, 
   Settings, 
   Wand2, 
+  Palette, 
   Code, 
   Layers,
   TrendingUp,
@@ -24,8 +26,10 @@ import {
   ArrowRight,
   RefreshCw,
   Copy,
+  Download,
   Award,
   AlertTriangle,
+  Info,
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
@@ -44,6 +48,12 @@ interface RefinementOption {
   instructions: string;
   optimizationFocus: string[];
   color: string;
+}
+
+// Helper type for score values
+interface CriterionScore {
+  score: number;
+  explanation?: string;
 }
 
 export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRefine }) => {
@@ -228,40 +238,42 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
     const handleReplaceInChatGPT = () => {
       const optimizedText = getOptimizedPrompt();
       
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id!, {
-            type: 'REPLACE_CHATGPT_TEXT',
-            text: optimizedText
-          }, (response) => {
-            if (chrome.runtime.lastError) {
-              console.log('Error replacing ChatGPT text:', chrome.runtime.lastError);
-            } else if (response && response.success) {
-              window.close();
-            }
-          });
-        }
-      });
+      if (typeof window !== 'undefined' && window.chrome?.tabs) {
+        window.chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+          if (tabs[0]) {
+            window.chrome.tabs.sendMessage(tabs[0].id!, {
+              type: 'REPLACE_CHATGPT_TEXT',
+              text: optimizedText
+            }, (response: any) => {
+              if (window.chrome.runtime.lastError) {
+                console.log('Error replacing ChatGPT text:', window.chrome.runtime.lastError);
+              } else if (response && response.success) {
+                window.close();
+              }
+            });
+          }
+        });
+      }
     };
 
     return (
       <div className="space-y-6">
         {/* Hero Score Section */}
         <div className="relative overflow-hidden bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 rounded-3xl p-8 border border-green-200/50 shadow-xl">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400/20 to-blue-400/20 rounded-full -mr-16 -mt-16"></div>
+          <div className="absolute top-0 right-0 w-32 h-62 bg-gradient-to-br from-green-400/20 to-blue-400/20 rounded-full -mr-16 -mt-16"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-purple-400/20 to-pink-400/20 rounded-full -ml-12 -mb-12"></div>
           
           <div className="relative">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
+                <div className="w-16 h-26 bg-gradient-to-r from-green-500 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
                   <TrendingUp size={32} className="text-white" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
                     Optimization Complete
                   </h2>
-                  <p className="text-gray-600 text-lg">Your prompt has been enhanced significantly</p>
+                  <p className="text-gray-600 text-lg">Your prompt has been enhanced greatly!</p>
                 </div>
               </div>
               
@@ -279,9 +291,8 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
             {/* Quick Score Overview */}
             <div className="grid grid-cols-3 gap-4 mb-6">
               {topScoreEntries.map(([key, value]) => {
-                const score = (value as any).score;
-                const originalScoreValue = originalScores[key as keyof typeof originalScores];
-                const originalScore = typeof originalScoreValue === 'object' ? originalScoreValue?.score : originalScoreValue || 5;
+                const score = (value as CriterionScore).score;
+                const originalScore = (originalScores[key as keyof typeof originalScores] as CriterionScore)?.score || 5;
                 const ScoreIcon = getScoreIcon(score);
                 
                 return (
@@ -314,9 +325,8 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
                 {Object.entries(scores)
                   .filter(([key, value]) => key !== 'overall' && typeof value === 'object' && 'score' in value)
                   .map(([key, value]) => {
-                    const score = (value as any).score;
-                    const originalScoreValue = originalScores[key as keyof typeof originalScores];
-                    const originalScore = typeof originalScoreValue === 'object' ? originalScoreValue?.score : originalScoreValue || 5;
+                    const score = (value as CriterionScore).score;
+                    const originalScore = (originalScores[key as keyof typeof originalScores] as CriterionScore)?.score || 5;
                     
                     return (
                       <div key={key} className="bg-white/50 backdrop-blur-sm rounded-lg p-3 border border-white/30">
@@ -351,10 +361,13 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
                   <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
                     <Shield size={20} />
                     <span>Issues Fixed</span>
+                    <div className="ml-auto bg-white/20 px-2 py-1 rounded text-xs">
+                      {primaryIssues.length} issues
+                    </div>
                   </h3>
                 </div>
                 
-                <div className="p-6">
+                <div className="p-6 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-red-200 scrollbar-track-transparent">
                   <div className="space-y-3">
                     {primaryIssues.slice(0, showAllIssues ? undefined : 3).map((item, index) => (
                       <div key={index} className="flex items-start space-x-3 p-3 bg-red-50 rounded-lg border border-red-200">
@@ -366,7 +379,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
                     {primaryIssues.length > 3 && (
                       <button
                         onClick={() => setShowAllIssues(!showAllIssues)}
-                        className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center space-x-1"
+                        className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center space-x-1 mt-3"
                       >
                         <span>{showAllIssues ? 'Show less' : `Show ${primaryIssues.length - 3} more issues`}</span>
                         {showAllIssues ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -383,11 +396,14 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
                 <div className="bg-gradient-to-r from-green-500 to-blue-500 px-6 py-4">
                   <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
                     <Sparkles size={20} />
-                    <span>Improvements Made</span>
+                    <span>Improvements Mades To the prompt</span>
+                    <div className="ml-auto bg-white/20 px-2 py-1 rounded text-xs">
+                      {majorImprovements.length} improvements
+                    </div>
                   </h3>
                 </div>
                 
-                <div className="p-6">
+                <div className="p-6 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-transparent">
                   <div className="space-y-3">
                     {majorImprovements.map((item, index) => (
                       <div key={index} className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
@@ -403,30 +419,41 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
         )}
 
         {/* Original vs Optimized Comparison */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           <h3 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
             <Eye size={24} />
             <span>Before & After Comparison</span>
           </h3>
           
           <div className="grid md:grid-cols-2 gap-6">
+            {/* Original Prompt */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-lg">
               <div className="bg-gradient-to-r from-gray-500 to-gray-600 px-4 py-3 border-b border-gray-200">
-                <h4 className="text-sm font-semibold text-white flex items-center space-x-2">
-                  <Eye size={16} />
-                  <span>Original Prompt</span>
-                  <div className="ml-auto bg-white/20 px-2 py-1 rounded text-xs">
-                    Score: {originalOverallScore.toFixed(1)}/10
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-white flex items-center space-x-2">
+                    <Eye size={16} />
+                    <span>Original Prompt</span>
+                  </h4>
+                  <div className="flex items-center space-x-2">
+                    <div className="bg-white/20 px-2 py-1 rounded text-xs text-white">
+                      Score: {originalOverallScore.toFixed(1)}/10
+                    </div>
+                    {primaryIssues.length > 0 && (
+                      <div className="bg-red-500/20 px-2 py-1 rounded text-xs text-red-100">
+                        {primaryIssues.length} issues
+                      </div>
+                    )}
                   </div>
-                </h4>
+                </div>
               </div>
-              <div className="p-4 max-h-48 overflow-y-auto">
+              <div className="p-4 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                 <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
                   {getOriginalPrompt()}
                 </p>
               </div>
             </div>
 
+            {/* Optimized Prompt */}
             <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border border-blue-200 overflow-hidden shadow-lg">
               <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3">
                 <div className="flex items-center justify-between">
@@ -438,6 +465,11 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
                     <div className="bg-white/20 px-2 py-1 rounded text-xs text-white">
                       Score: {overallScore.toFixed(1)}/10
                     </div>
+                    {majorImprovements.length > 0 && (
+                      <div className="bg-green-500/20 px-2 py-1 rounded text-xs text-green-100">
+                        {majorImprovements.length} improvements
+                      </div>
+                    )}
                     <button
                       onClick={handleCopy}
                       className="flex items-center space-x-1 px-3 py-1 bg-white/20 rounded-lg text-white hover:bg-white/30 transition-all"
@@ -448,7 +480,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
                   </div>
                 </div>
               </div>
-              <div className="p-4 max-h-48 overflow-y-auto">
+              <div className="p-4 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200 scrollbar-track-transparent">
                 <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
                   {getOptimizedPrompt()}
                 </p>
@@ -493,42 +525,47 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
             <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
               <Gauge size={20} />
               <span>Detailed Performance Metrics</span>
+              <div className="ml-auto bg-white/20 px-2 py-1 rounded text-xs">
+                {scoreEntries.length} metrics
+              </div>
             </h3>
           </div>
           
-          <div className="p-6 space-y-4">
-            {scoreEntries.map(([key, value]) => {
-              const score = (value as any).score;
-              const explanation = (value as any).explanation;
-              const ScoreIcon = getScoreIcon(score);
-              
-              return (
-                <div key={key} className="bg-gray-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <ScoreIcon size={18} className={getScoreTextColor(score)} />
-                      <span className="font-semibold capitalize text-gray-700">
-                        {key.replace(/_/g, ' ')}
+          <div className="p-6 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+            <div className="space-y-4">
+              {scoreEntries.map(([key, value]) => {
+                const score = (value as CriterionScore).score;
+                const explanation = (value as CriterionScore).explanation;
+                const ScoreIcon = getScoreIcon(score);
+                
+                return (
+                  <div key={key} className="bg-gray-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <ScoreIcon size={18} className={getScoreTextColor(score)} />
+                        <span className="font-semibold capitalize text-gray-700">
+                          {key.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <span className="text-lg font-bold text-gray-900">
+                        {score}/10
                       </span>
                     </div>
-                    <span className="text-lg font-bold text-gray-900">
-                      {score}/10
-                    </span>
+                    
+                    <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
+                      <div 
+                        className={`bg-gradient-to-r ${getScoreColor(score)} h-3 rounded-full transition-all duration-500`}
+                        style={{ width: `${score * 10}%` }}
+                      ></div>
+                    </div>
+                    
+                    {explanation && (
+                      <p className="text-sm text-gray-600 leading-relaxed">{explanation}</p>
+                    )}
                   </div>
-                  
-                  <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
-                    <div 
-                      className={`bg-gradient-to-r ${getScoreColor(score)} h-3 rounded-full transition-all duration-500`}
-                      style={{ width: `${score * 10}%` }}
-                    ></div>
-                  </div>
-                  
-                  {explanation && (
-                    <p className="text-sm text-gray-600 leading-relaxed">{explanation}</p>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
         
@@ -537,10 +574,13 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
             <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
               <TrendingUp size={20} />
               <span>Key Improvements</span>
+              <div className="ml-auto bg-white/20 px-2 py-1 rounded text-xs">
+                {getKeyImprovements().length} improvements
+              </div>
             </h3>
           </div>
           
-          <div className="p-6">
+          <div className="p-6 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-transparent">
             <div className="space-y-3">
               {getKeyImprovements().map((item, index) => (
                 <div key={index} className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
@@ -566,10 +606,13 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
               <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
                 <AlertCircle size={20} />
                 <span>Issues Identified</span>
+                <div className="ml-auto bg-white/20 px-2 py-1 rounded text-xs">
+                  {feedback.what_was_wrong.primary_issues.length} issues
+                </div>
               </h3>
             </div>
             
-            <div className="p-6">
+            <div className="p-6 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-red-200 scrollbar-track-transparent">
               <div className="space-y-3">
                 {feedback.what_was_wrong.primary_issues.map((item, index) => (
                   <div key={index} className="flex items-start space-x-3 p-3 bg-red-50 rounded-lg border border-red-200">
@@ -587,11 +630,14 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
             <div className="bg-gradient-to-r from-green-500 to-blue-500 px-4 py-3">
               <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
                 <CheckCircle2 size={20} />
-                <span>Improvements Made</span>
+                <span>Improvements Mades To the prompt</span>
+                <div className="ml-auto bg-white/20 px-2 py-1 rounded text-xs">
+                  {feedback.what_was_improved.major_improvements.length} improvements
+                </div>
               </h3>
             </div>
             
-            <div className="p-6">
+            <div className="p-6 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-transparent">
               <div className="space-y-3">
                 {feedback.what_was_improved.major_improvements.map((item, index) => (
                   <div key={index} className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
@@ -609,10 +655,13 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
             <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
               <Lightbulb size={20} />
               <span>Recommendations</span>
+              <div className="ml-auto bg-white/20 px-2 py-1 rounded text-xs">
+                {getRecommendations().length} recommendations
+              </div>
             </h3>
           </div>
           
-          <div className="p-6">
+          <div className="p-6 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-yellow-200 scrollbar-track-transparent">
             <div className="space-y-3">
               {getRecommendations().map((item, index) => (
                 <div key={index} className="flex items-start space-x-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
@@ -761,7 +810,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onBack, onRe
       </div>
 
       {/* Main Content with Improved Scrolling */}
-      <div className="flex-1 overflow-y-auto p-6" style={{ scrollBehavior: 'smooth' }}>
+      <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent" style={{ scrollBehavior: 'smooth' }}>
         <div className="max-w-4xl mx-auto">
           {renderContent()}
         </div>

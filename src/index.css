@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar styles */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Color-specific scrollbar styles */
+.scrollbar-thumb-red-200::-webkit-scrollbar-thumb {
+  background: #fecaca;
+}
+
+.scrollbar-thumb-red-200::-webkit-scrollbar-thumb:hover {
+  background: #fca5a5;
+}
+
+.scrollbar-thumb-green-200::-webkit-scrollbar-thumb {
+  background: #bbf7d0;
+}
+
+.scrollbar-thumb-green-200::-webkit-scrollbar-thumb:hover {
+  background: #86efac;
+}
+
+.scrollbar-thumb-blue-200::-webkit-scrollbar-thumb {
+  background: #bfdbfe;
+}
+
+.scrollbar-thumb-blue-200::-webkit-scrollbar-thumb:hover {
+  background: #93c5fd;
+}
+
+.scrollbar-thumb-gray-200::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+}
+
+.scrollbar-thumb-gray-200::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
+
+.scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+}
+
+.scrollbar-thumb-gray-300::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.scrollbar-thumb-yellow-200::-webkit-scrollbar-thumb {
+  background: #fef3c7;
+}
+
+.scrollbar-thumb-yellow-200::-webkit-scrollbar-thumb:hover {
+  background: #fde68a;
+}
+
+/* Ensure scrollbars are always visible */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+/* Firefox scrollbar styles */
+.overflow-y-auto {
+  scrollbar-width: thin;
+}
+
+/* Ensure content doesn't get clipped */
+.overflow-y-auto > * {
+  min-height: min-content;
+} 

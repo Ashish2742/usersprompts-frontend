@@ -1,648 +1,361 @@
-
-import React, { useState, useEffect } from 'react';
-import { apiService } from '../services/api';
+import React, { useState } from 'react';
 import { ResultViewer } from './ResultViewer';
-import { PromptOptimizationResult, OptimizationAnalysis } from '../types/api';
+import { PromptOptimizationResult } from '../types/api';
 import { 
+  Clipboard, 
+  Check, 
+  ArrowLeft, 
+  Lightbulb, 
+  BarChart2, 
   Zap, 
-  FileText, 
-  Copy, 
-  CheckCircle, 
-  Wifi, 
-  WifiOff, 
-  RefreshCw, 
-  AlertTriangle, 
-  Loader2, 
-  Wand2,
-  Sparkles,
-  Target,
-  BarChart3,
-  History,
-  TrendingUp,
-  Clock,
-  ArrowRight,
-  Users,
+  Sparkles, 
+  Target, 
+  Settings, 
+  Wand2, 
+  Palette, 
+  Code, 
   Layers,
-  Code,
-  Palette,
-  Settings,
-  Plus,
-  ChevronDown,
-  ChevronUp,
-  Star,
+  TrendingUp,
+  Shield,
+  Eye,
+  Users,
+  Gauge,
+  CheckCircle2,
   AlertCircle,
+  Star,
+  ArrowRight,
+  RefreshCw,
+  Copy,
+  Download,
+  Award,
+  AlertTriangle,
   Info,
-  CheckCircle2
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
-
-interface OptimizationHistoryItem {
-  iteration: number;
-  prompt: string;
-  score: number;
-  timestamp: Date;
-  refinementType: string;
-  analysis?: OptimizationAnalysis;
-}
-
-interface QuickRefinementOption {
-  id: string;
-  label: string;
-  description: string;
-  icon: React.ElementType;
-  instructions: string;
-  color: string;
-}
 
 interface OneClickOptimizerProps {
   initialText?: string;
-  onResult?: (result: PromptOptimizationResult) => void;
 }
 
-const OneClickOptimizer: React.FC<OneClickOptimizerProps> = ({ 
-  initialText = '', 
-  onResult 
-}) => {
-  const [currentPrompt, setCurrentPrompt] = useState(initialText);
-  const [isOptimizing, setIsOptimizing] = useState(false);
+export const OneClickOptimizer: React.FC<OneClickOptimizerProps> = ({ initialText = "" }) => {
+  const [prompt, setPrompt] = useState(initialText);
+  const [context, setContext] = useState("");
+  const [targetAudience, setTargetAudience] = useState("");
+  const [optimizationFocus, setOptimizationFocus] = useState<string[]>([]);
+  const [constraints, setConstraints] = useState("");
   const [result, setResult] = useState<PromptOptimizationResult | null>(null);
-  const [error, setError] = useState<string>('');
-  const [isConnected, setIsConnected] = useState(true);
-  const [isConnecting, setIsConnecting] = useState(true);
-  const [optimizationHistory, setOptimizationHistory] = useState<OptimizationHistoryItem[]>([]);
-  const [currentIteration, setCurrentIteration] = useState(0);
-  const [copied, setCopied] = useState(false);
-  const [showAdvancedView, setShowAdvancedView] = useState(false);
-  const [customRefinement, setCustomRefinement] = useState('');
-  const [showCustomRefinement, setShowCustomRefinement] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [error, setError] = useState("");
+  const [isConnected, setIsConnected] = useState(false);
+  const [optimizationLevel, setOptimizationLevel] = useState("basic");
 
-  const quickRefinementOptions: QuickRefinementOption[] = [
-    {
-      id: 'concise',
-      label: 'Make Concise',
-      description: 'Simplify and shorten',
-      icon: Target,
-      instructions: 'Make this prompt more concise and to the point while maintaining all essential information',
-      color: 'from-blue-500 to-cyan-500'
-    },
-    {
-      id: 'detailed',
-      label: 'Add Details',
-      description: 'Expand with specifics',
-      icon: Layers,
-      instructions: 'Add more specific details, examples, and comprehensive information to make this prompt more thorough',
-      color: 'from-green-500 to-teal-500'
-    },
-    {
-      id: 'professional',
-      label: 'Professional',
-      description: 'Business-appropriate',
-      icon: Code,
-      instructions: 'Transform this prompt to have a more professional, formal, and business-appropriate tone',
-      color: 'from-gray-600 to-gray-800'
-    },
-    {
-      id: 'creative',
-      label: 'Creative',
-      description: 'More imaginative',
-      icon: Sparkles,
-      instructions: 'Make this prompt more creative, engaging, and imaginative while maintaining its core purpose',
-      color: 'from-purple-500 to-pink-500'
-    }
-  ];
-
-  useEffect(() => {
-    testConnection();
+  React.useEffect(() => {
     if (initialText) {
-      setCurrentPrompt(initialText);
+      setPrompt(initialText);
     }
+    testConnection();
   }, [initialText]);
 
   const testConnection = async () => {
-    setIsConnecting(true);
-    setError('');
     try {
-      await apiService.testConnection();
-      setIsConnected(true);
-    } catch (error) {
+      const response = await fetch('http://localhost:8000/api/v1/prompt-optimizer/specializations');
+      if (response.ok) {
+        setIsConnected(true);
+        setError("");
+      } else {
+        setIsConnected(false);
+        setError("API server is not running. Please start the server at localhost:8000");
+      }
+    } catch {
       setIsConnected(false);
-      setError('API server is not running. Start the server at localhost:8000');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy text: ', err);
+      setError("API server is not running. Please start the server at localhost:8000");
     }
   };
 
   const handleOptimize = async () => {
-    if (!currentPrompt.trim() || !isConnected) return;
-    
+    if (!prompt.trim()) return;
+
     setIsOptimizing(true);
-    setError('');
-    setResult(null);
+    setError("");
 
     try {
-      const response = await apiService.optimizePrompt({
-        system_prompt: currentPrompt.trim(),
-        optimization_focus: ['clarity', 'specificity', 'completeness', 'effectiveness']
+      const response = await fetch('http://localhost:8000/api/v1/prompt-optimizer/optimize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          system_prompt: prompt.trim(),
+          context: context.trim() || undefined,
+          target_audience: targetAudience.trim() || undefined,
+          optimization_focus: optimizationFocus.length > 0 ? optimizationFocus : undefined,
+          constraints: constraints.trim() || undefined,
+        }),
       });
-      
-      if (!response.optimized_prompt) {
-        throw new Error('Invalid response: missing optimized_prompt');
+
+      if (response.ok) {
+        const data = await response.json();
+        setResult(data);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Optimization failed");
+        testConnection();
       }
-      
-      setResult(response);
-      if (onResult) {
-        onResult(response);
-      }
-      
-      setCurrentIteration(prev => prev + 1);
-      
-      const historyItem: OptimizationHistoryItem = {
-        iteration: currentIteration + 1,
-        prompt: response.optimized_prompt,
-        score: response.scores?.optimized?.overall || 7.0,
-        timestamp: new Date(),
-        refinementType: 'optimization',
-        analysis: response.optimization_analysis
-      };
-      
-      setOptimizationHistory(prev => [historyItem, ...prev]);
-      
-    } catch (error: any) {
-      let errorMessage = 'Optimization failed';
-      
-      if (error?.message) {
-        if (error.message.includes('429') || error.message.includes('quota') || error.message.includes('exceeded')) {
-          errorMessage = 'API quota exceeded. Please try again later.';
-        } else if (error.message.includes('timeout')) {
-          errorMessage = 'Request timed out. Please check the server connection.';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
-      setError(errorMessage);
+    } catch (error) {
+      setError("Optimization failed");
       testConnection();
     } finally {
       setIsOptimizing(false);
     }
   };
 
-  const handleQuickRefinement = async (option: QuickRefinementOption) => {
-    if (!result?.optimized_prompt) return;
-    
-    setIsOptimizing(true);
-    setError('');
-
-    try {
-      const response = await apiService.optimizePrompt({
-        system_prompt: result.optimized_prompt,
-        context: `Refinement instructions: ${option.instructions}`,
-        optimization_focus: ['clarity', 'specificity', 'completeness']
-      });
-      
-      setResult(response);
-      if (onResult) {
-        onResult(response);
-      }
-      
-      const historyItem: OptimizationHistoryItem = {
-        iteration: currentIteration + 1,
-        prompt: response.optimized_prompt,
-        score: response.scores?.optimized?.overall || 7.0,
-        timestamp: new Date(),
-        refinementType: option.id,
-        analysis: response.optimization_analysis
-      };
-      
-      setOptimizationHistory(prev => [historyItem, ...prev]);
-      setCurrentIteration(prev => prev + 1);
-      
-    } catch (error: any) {
-      setError(error.message || 'Refinement failed');
-    } finally {
-      setIsOptimizing(false);
-    }
+  const handleFocusToggle = (focus: string) => {
+    setOptimizationFocus(prev => 
+      prev.includes(focus) 
+        ? prev.filter(f => f !== focus)
+        : [...prev, focus]
+    );
   };
 
-  const handleCustomRefinement = async () => {
-    if (!result?.optimized_prompt || !customRefinement.trim()) return;
-    
-    setIsOptimizing(true);
-    setError('');
+  const optimizationLevels = [
+    { id: "basic", label: "Basic", icon: "⚡", description: "Quick improvements" },
+    { id: "advanced", label: "Advanced", icon: "🚀", description: "Comprehensive optimization" },
+    { id: "expert", label: "Expert", icon: "🎯", description: "Professional-grade refinement" }
+  ];
 
-    try {
-      const response = await apiService.optimizePrompt({
-        system_prompt: result.optimized_prompt,
-        context: `Custom refinement: ${customRefinement}`,
-        optimization_focus: ['clarity', 'specificity', 'completeness']
-      });
-      
-      setResult(response);
-      if (onResult) {
-        onResult(response);
-      }
-      
-      const historyItem: OptimizationHistoryItem = {
-        iteration: currentIteration + 1,
-        prompt: response.optimized_prompt,
-        score: response.scores?.optimized?.overall || 7.0,
-        timestamp: new Date(),
-        refinementType: 'custom',
-        analysis: response.optimization_analysis
-      };
-      
-      setOptimizationHistory(prev => [historyItem, ...prev]);
-      setCurrentIteration(prev => prev + 1);
-      setCustomRefinement('');
-      setShowCustomRefinement(false);
-      
-    } catch (error: any) {
-      setError(error.message || 'Custom refinement failed');
-    } finally {
-      setIsOptimizing(false);
-    }
-  };
-
-  const handleReplaceInChatGPT = () => {
-    const textToReplace = result?.optimized_prompt || optimizationHistory[0]?.prompt;
-    if (!textToReplace) return;
-    
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id!, {
-          type: 'REPLACE_CHATGPT_TEXT',
-          text: textToReplace
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            console.log('Error replacing ChatGPT text:', chrome.runtime.lastError);
-          } else if (response && response.success) {
-            window.close();
-          }
-        });
-      }
-    });
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-600';
-    if (score >= 6) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  const getScoreBadgeColor = (score: number) => {
-    if (score >= 8) return 'bg-green-50 text-green-700 border-green-200';
-    if (score >= 6) return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-    return 'bg-red-50 text-red-700 border-red-200';
-  };
-
-  if (showAdvancedView && result) {
+  if (result) {
     return (
       <ResultViewer 
         result={result} 
-        onBack={() => setShowAdvancedView(false)}
+        onBack={() => setResult(null)}
+        onRefine={async (instructions, refinementType, focus) => {
+          setIsOptimizing(true);
+          try {
+            const response = await fetch('http://localhost:8000/api/v1/prompt-optimizer/optimize', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                system_prompt: result.optimized_prompt,
+                context: instructions,
+                optimization_focus: focus,
+              }),
+            });
+
+            if (response.ok) {
+              const newResult = await response.json();
+              setResult(newResult);
+            } else {
+              setError("Refinement failed");
+            }
+          } catch {
+            setError("Refinement failed");
+          } finally {
+            setIsOptimizing(false);
+          }
+        }}
       />
     );
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-slate-50 via-white to-blue-50 flex flex-col">
+    <div className="bg-white min-h-screen">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 p-4 flex-shrink-0">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-              <Wand2 size={20} className="text-white" />
+            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">Prompt Optimizer</h1>
-              <p className="text-sm text-slate-600">AI-powered prompt enhancement</p>
+              <h1 className="text-lg font-bold">Prompt Optimizer</h1>
+              <p className="text-blue-100 text-xs">Advanced AI-powered optimization</p>
             </div>
           </div>
-          
           <div className="flex items-center space-x-2">
-            <div className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
-              isConnected 
-                ? 'bg-green-50 text-green-700 border border-green-200' 
-                : 'bg-red-50 text-red-700 border border-red-200'
+            <div className={`px-2 py-1 rounded text-xs font-medium ${
+              isConnected ? "bg-green-500/20 text-green-100" : "bg-red-500/20 text-red-100"
             }`}>
-              {isConnecting ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : isConnected ? (
-                <Wifi size={12} />
-              ) : (
-                <WifiOff size={12} />
-              )}
-              <span>{isConnecting ? 'Connecting...' : isConnected ? 'Connected' : 'Offline'}</span>
+              {isConnected ? "Connected" : "Disconnected"}
             </div>
-            
             <button
               onClick={testConnection}
-              disabled={isConnecting}
-              className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-800 transition-all disabled:opacity-50"
+              className="w-6 h-6 bg-white/20 rounded flex items-center justify-center hover:bg-white/30 transition-colors"
+              title="Retry connection"
             >
-              <RefreshCw size={14} className={isConnecting ? 'animate-spin' : ''} />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              </svg>
             </button>
           </div>
         </div>
       </div>
 
       {/* Connection Error */}
-      {!isConnected && !isConnecting && (
-        <div className="mx-4 mt-4 bg-red-50 border border-red-200 rounded-lg p-3 flex-shrink-0">
-          <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
-            <p className="text-red-700 text-sm">{error}</p>
+      {!isConnected && (
+        <div className="bg-red-50 border-b border-red-200 p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+              </svg>
+              <span className="text-red-700 text-sm font-medium">API Server Not Connected</span>
+            </div>
+            <button
+              onClick={testConnection}
+              className="text-red-600 hover:text-red-800 text-sm font-medium"
+            >
+              Retry
+            </button>
           </div>
         </div>
       )}
 
-      {/* Main Content - Scrollable */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Input Section */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="border-b border-slate-200 p-4">
-            <div className="flex items-center space-x-2">
-              <FileText size={18} className="text-slate-600" />
-              <h2 className="font-semibold text-slate-900">Your Prompt</h2>
-            </div>
-          </div>
-          
-          <div className="p-4">
-            <textarea
-              value={currentPrompt}
-              onChange={(e) => setCurrentPrompt(e.target.value)}
-              placeholder="Enter your prompt here..."
-              className="w-full h-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
-            />
-            
-            <div className="flex items-center justify-between mt-3">
-              <div className="text-xs text-slate-500">
-                {currentPrompt.length} characters
-              </div>
-              
+      {/* Main Content */}
+      <div className="p-4 space-y-4">
+        {/* Optimization Level */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <label className="text-sm font-semibold text-gray-900 mb-3 block">
+            Optimization Level
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {optimizationLevels.map((level) => (
               <button
-                onClick={handleOptimize}
-                disabled={isOptimizing || !currentPrompt.trim() || !isConnected || isConnecting}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+                key={level.id}
+                onClick={() => setOptimizationLevel(level.id)}
+                className={`p-3 rounded border-2 text-xs transition-all ${
+                  optimizationLevel === level.id
+                    ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                    : "bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-gray-200"
+                }`}
               >
-                {isOptimizing ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Optimizing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={16} />
-                    <span>Optimize</span>
-                  </>
-                )}
+                <div className="text-sm mb-1">{level.icon}</div>
+                <div className="font-medium">{level.label}</div>
+                <div className="text-xs opacity-75">{level.description}</div>
               </button>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Results Section */}
-        {result && (
-          <div className="space-y-4">
-            {/* Score Overview */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-              <div className="border-b border-slate-200 p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-slate-900 flex items-center space-x-2">
-                    <TrendingUp size={18} className="text-green-600" />
-                    <span>Optimization Complete</span>
-                  </h3>
-                  
-                  <div className="flex items-center space-x-3">
-                    {/* Original Score */}
-                    <div className="text-center">
-                      <div className="text-xs text-slate-500 mb-1">Original</div>
-                      <div className={`text-lg font-bold ${getScoreColor(result.scores?.original?.overall || 5)}`}>
-                        {(result.scores?.original?.overall || 5).toFixed(1)}
-                      </div>
-                    </div>
-                    
-                    <ArrowRight size={16} className="text-slate-400" />
-                    
-                    {/* Optimized Score */}
-                    <div className="text-center">
-                      <div className="text-xs text-slate-500 mb-1">Optimized</div>
-                      <div className={`text-xl font-bold ${getScoreColor(result.scores?.optimized?.overall || 8.5)}`}>
-                        {(result.scores?.optimized?.overall || 8.5).toFixed(1)}
-                      </div>
-                    </div>
-                    
-                    {/* Improvement Badge */}
-                    <div className="bg-green-50 border border-green-200 rounded-lg px-2 py-1">
-                      <div className="text-xs text-green-700 font-medium">
-                        +{((result.scores?.optimized?.overall || 8.5) - (result.scores?.original?.overall || 5)).toFixed(1)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+        {/* System Prompt */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <label className="text-sm font-semibold text-gray-900 mb-3 block">
+            System Prompt
+            {isOptimizing && (
+              <span className="ml-2 inline-flex items-center text-blue-600">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                </svg>
+                Optimizing...
+              </span>
+            )}
+          </label>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Enter your system prompt here..."
+            className="w-full px-3 py-2 border border-gray-200 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            rows={6}
+          />
+        </div>
 
-            {/* Issues and Improvements */}
-            <div className="grid grid-cols-1 gap-4">
-              {/* Issues Found */}
-              {result.detailed_feedback?.what_was_wrong?.primary_issues && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                  <div className="border-b border-slate-200 p-4">
-                    <h3 className="font-semibold text-slate-900 flex items-center space-x-2">
-                      <AlertCircle size={18} className="text-red-500" />
-                      <span>Issues Found</span>
-                    </h3>
-                  </div>
-                  <div className="p-4">
-                    <div className="space-y-2">
-                      {result.detailed_feedback.what_was_wrong.primary_issues.map((issue, index) => (
-                        <div key={index} className="flex items-start space-x-2 p-2 bg-red-50 rounded-lg border border-red-100">
-                          <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={14} />
-                          <span className="text-sm text-red-700">{issue}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+        {/* Context */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <label className="text-sm font-semibold text-gray-900 mb-3 block">
+            Context (Optional)
+          </label>
+          <textarea
+            value={context}
+            onChange={(e) => setContext(e.target.value)}
+            placeholder="Additional context for optimization..."
+            className="w-full px-3 py-2 border border-gray-200 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            rows={3}
+          />
+        </div>
 
-              {/* Improvements Made */}
-              {result.detailed_feedback?.what_was_improved?.major_improvements && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                  <div className="border-b border-slate-200 p-4">
-                    <h3 className="font-semibold text-slate-900 flex items-center space-x-2">
-                      <CheckCircle2 size={18} className="text-green-500" />
-                      <span>Improvements Made</span>
-                    </h3>
-                  </div>
-                  <div className="p-4">
-                    <div className="space-y-2">
-                      {result.detailed_feedback.what_was_improved.major_improvements.map((improvement, index) => (
-                        <div key={index} className="flex items-start space-x-2 p-2 bg-green-50 rounded-lg border border-green-100">
-                          <CheckCircle2 className="text-green-500 flex-shrink-0 mt-0.5" size={14} />
-                          <span className="text-sm text-green-700">{improvement}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+        {/* Target Audience */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <label className="text-sm font-semibold text-gray-900 mb-3 block">
+            Target Audience (Optional)
+          </label>
+          <input
+            type="text"
+            value={targetAudience}
+            onChange={(e) => setTargetAudience(e.target.value)}
+            placeholder="e.g., Developers, Students, Business Users"
+            className="w-full px-3 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
 
-            {/* Prompt Comparison */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-              <div className="border-b border-slate-200 p-4">
-                <h3 className="font-semibold text-slate-900">Prompt Comparison</h3>
-              </div>
-              
-              <div className="p-4 space-y-4">
-                {/* Original Prompt */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-medium text-slate-700">Original Prompt</h4>
-                    <span className={`text-xs px-2 py-1 rounded border ${getScoreBadgeColor(result.scores?.original?.overall || 5)}`}>
-                      Score: {(result.scores?.original?.overall || 5).toFixed(1)}/10
-                    </span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                      {result.original_prompt}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Optimized Prompt */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-medium text-slate-700">Optimized Prompt</h4>
-                    <div className="flex items-center space-x-2">
-                      <span className={`text-xs px-2 py-1 rounded border ${getScoreBadgeColor(result.scores?.optimized?.overall || 8.5)}`}>
-                        Score: {(result.scores?.optimized?.overall || 8.5).toFixed(1)}/10
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(result.optimized_prompt || '')}
-                        className="p-1 hover:bg-slate-100 rounded"
-                      >
-                        {copied ? <CheckCircle size={14} className="text-green-500" /> : <Copy size={14} className="text-slate-500" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                      {result.optimized_prompt}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
+        {/* Optimization Focus */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <label className="text-sm font-semibold text-gray-900 mb-3 block">
+            Optimization Focus (Optional)
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {["clarity", "specificity", "completeness", "effectiveness", "robustness"].map((focus) => (
               <button
-                onClick={handleReplaceInChatGPT}
-                className="flex-1 flex items-center justify-center space-x-2 py-3 px-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-lg font-medium hover:from-green-700 hover:to-blue-700 transition-all"
+                key={focus}
+                onClick={() => handleFocusToggle(focus)}
+                className={`p-3 rounded border text-xs transition-all ${
+                  optimizationFocus.includes(focus)
+                    ? "bg-blue-50 border-blue-300 text-blue-700"
+                    : "bg-white border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                }`}
               >
-                <Zap size={16} />
-                <span>Use in ChatGPT</span>
-                <ArrowRight size={14} />
+                <div className="font-medium capitalize">{focus}</div>
               </button>
-              
-              <button
-                onClick={() => setShowAdvancedView(true)}
-                className="flex-1 flex items-center justify-center space-x-2 py-3 px-4 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-all"
-              >
-                <BarChart3 size={16} />
-                <span>Detailed Analysis</span>
-              </button>
-            </div>
-
-            {/* Quick Refinements */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-              <div className="border-b border-slate-200 p-4">
-                <h3 className="font-semibold text-slate-900 flex items-center space-x-2">
-                  <Sparkles size={18} className="text-purple-600" />
-                  <span>Quick Refinements</span>
-                </h3>
-                <p className="text-sm text-slate-600 mt-1">One-click improvements</p>
-              </div>
-              
-              <div className="p-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {quickRefinementOptions.map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => handleQuickRefinement(option)}
-                      disabled={isOptimizing}
-                      className="p-3 rounded-lg border border-slate-200 hover:border-purple-300 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-left"
-                    >
-                      <div className="flex items-center space-x-2 mb-1">
-                        <div className={`w-6 h-6 rounded bg-gradient-to-r ${option.color} flex items-center justify-center`}>
-                          <option.icon size={12} className="text-white" />
-                        </div>
-                        <span className="font-medium text-sm text-slate-900">{option.label}</span>
-                      </div>
-                      <p className="text-xs text-slate-600">{option.description}</p>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Custom Refinement Toggle */}
-                <button
-                  onClick={() => setShowCustomRefinement(!showCustomRefinement)}
-                  className="w-full mt-3 flex items-center justify-center space-x-2 py-2 px-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-purple-400 hover:text-purple-600 transition-all"
-                >
-                  <Plus size={14} />
-                  <span className="text-sm font-medium">Custom Refinement</span>
-                  {showCustomRefinement ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-
-                {/* Custom Refinement Input */}
-                {showCustomRefinement && (
-                  <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                    <textarea
-                      value={customRefinement}
-                      onChange={(e) => setCustomRefinement(e.target.value)}
-                      placeholder="Describe how you'd like to refine your prompt..."
-                      className="w-full h-16 px-3 py-2 border border-slate-200 rounded-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition text-sm"
-                    />
-                    <button
-                      onClick={handleCustomRefinement}
-                      disabled={isOptimizing || !customRefinement.trim()}
-                      className="mt-2 w-full bg-gradient-to-r from-purple-600 to-pink-600 py-2 px-4 rounded-lg text-white font-medium hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
-                    >
-                      {isOptimizing ? (
-                        <div className="flex items-center justify-center space-x-2">
-                          <Loader2 size={14} className="animate-spin" />
-                          <span>Refining...</span>
-                        </div>
-                      ) : (
-                        'Apply Refinement'
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+            ))}
           </div>
-        )}
+        </div>
+
+        {/* Constraints */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <label className="text-sm font-semibold text-gray-900 mb-3 block">
+            Constraints (Optional)
+          </label>
+          <textarea
+            value={constraints}
+            onChange={(e) => setConstraints(e.target.value)}
+            placeholder="Any constraints or requirements..."
+            className="w-full px-3 py-2 border border-gray-200 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            rows={2}
+          />
+        </div>
+
+        {/* Optimize Button */}
+        <button
+          onClick={handleOptimize}
+          disabled={isOptimizing || !prompt.trim() || !isConnected}
+          className="w-full py-3 px-4 rounded-lg text-base font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2"
+        >
+          {isOptimizing ? (
+            <>
+              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+              </svg>
+              <span>Optimizing...</span>
+            </>
+          ) : (
+            <>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+              <span>Optimize Prompt</span>
+            </>
+          )}
+        </button>
 
         {/* Error Display */}
-        {error && !isConnecting && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
-              <p className="text-red-700 text-sm">{error}</p>
-            </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded p-3">
+            <p className="text-red-700 text-sm">{error}</p>
           </div>
         )}
       </div>
